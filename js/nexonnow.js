@@ -1,7 +1,7 @@
 /* 넥슨 NOW 확률 - 직접 저장한 페이지를 nexon-now/ 폴더에 올리면 scripts/import_nexon_now.py 가 자동으로 만듭니다.
    출처: https://now.nexon.com/service/csonline (자동 업데이트 대상 아님 · 패치 때 다시 저장해서 올리면 갱신) */
 const NEXON_NOW = {
- "imported": "2026-11-11 23:24",
+ "imported": "2026-11-11 23:27",
  "menu": [
   [
    "해독기",
@@ -76,7 +76,7 @@ const NEXON_NOW = {
    "version": "2026년 09월 17일 업데이트",
    "period": "2026-11-11 22:00까지",
    "updated": "2026-11-11 23:01",
-   "saved": "2026-11-11 23:24",
+   "saved": "2026-11-11 23:27",
    "notes": [
     "※ 페이지 안내",
     "- 집계기간 중 시도(사용) 횟수가 충분히 누적되기 전까지는 설정 확률과 실제 결과의 차이가 나타날 수 있습니다.",
