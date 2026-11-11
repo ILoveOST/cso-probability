@@ -210,6 +210,104 @@ dialog::backdrop{background:rgba(4,6,10,.72);backdrop-filter:blur(3px)}
 .foot{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
 .foot p{margin:0 0 4px}
 
+/* ---------- 상단 변경 기록 버튼 ---------- */
+.tb-btn{position:relative;flex:0 0 auto;display:flex;align-items:center;gap:6px;height:36px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--sub);font-size:13px}
+.tb-btn:hover{color:var(--text);border-color:var(--line2)}
+.tb-btn svg{width:16px;height:16px}
+.tb-btn.fresh::after{content:"";position:absolute;top:6px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--bg)}
+.nav-item .star-i{width:16px;height:16px;flex:0 0 auto;display:grid;place-items:center;color:var(--c)}
+.nav-item .star-i svg{width:15px;height:15px}
+.nav-item.wish-nav .star-i svg{fill:var(--accent)}
+.kick-hist{border:0;background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent);border-radius:999px;padding:0 8px;font-size:11px;font-weight:700}
+
+/* ---------- 찜 별 ---------- */
+.star{display:inline-grid;place-items:center;color:#fff;cursor:pointer;transition:transform .12s,color .12s,opacity .12s}
+.star svg{width:16px;height:16px;stroke-width:1.8}
+.star.on{color:var(--accent);opacity:1}
+.star.on svg{fill:var(--accent)}
+.star:hover{transform:scale(1.15)}
+.star:focus-visible{outline:2px solid var(--accent);border-radius:6px}
+.thumb .star{position:absolute;right:6px;bottom:6px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,.55);opacity:.55}
+.card:hover .thumb .star{opacity:1}
+.thumb .star.on{opacity:1}
+.star.sm{color:var(--muted);width:20px;margin-right:4px;vertical-align:-3px}
+.star.sm svg{width:15px;height:15px}
+.star.big{margin-left:auto;width:36px;height:36px;border-radius:50%;border:1px solid var(--line2);color:var(--sub)}
+.star.big svg{width:19px;height:19px}
+
+/* ---------- 변동 배지 ---------- */
+.hb{display:inline-block;align-self:flex-start;font-size:10px;font-weight:800;padding:1px 6px;border-radius:4px;line-height:1.5;white-space:nowrap}
+.hb.new{background:#3fc98a;color:#06150e}
+.hb.up{background:color-mix(in srgb,#ff5f6d 22%,transparent);color:#ff8b95}
+.hb.down{background:color-mix(in srgb,#4aa3ff 22%,transparent);color:#7dbdff}
+.hb.gone{background:var(--panel3);color:var(--sub)}
+.tbl .hb{margin-left:6px;vertical-align:1px}
+
+/* ---------- 비용 ---------- */
+.price-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;font-size:13px;color:var(--sub)}
+.price-row label{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.price-row input,.calc-row.money input{width:110px;background:var(--bg2);border:1px solid var(--line2);border-radius:8px;padding:6px 10px;font-variant-numeric:tabular-nums}
+.price-row input:focus,.calc-row.money input:focus{outline:0;border-color:var(--accent)}
+.price-row .dist-hint{margin:0}
+.ccost{font-size:11px;color:var(--muted)}
+.ccost b{color:var(--sub);font-weight:700}
+.cost{color:var(--sub)}
+.calc-row.money{margin-top:8px;font-size:13px;color:var(--sub)}
+.calc-row.money label{display:flex;align-items:center;gap:6px}
+.calc-out{grid-template-columns:repeat(3,1fr)}
+.d-stat .v small{display:block;font-size:12px;font-weight:600;color:var(--sub)}
+.muted{color:var(--muted)}
+.note{font-size:12px;color:var(--muted);margin:6px 2px 0}
+
+/* ---------- 상세: 변동 기록 ---------- */
+.d-hist{margin-top:16px}
+.d-hist h3{margin:0 0 8px;font-size:13px;font-weight:700;color:var(--sub)}
+.d-hist ul,.h-dec ul{list-style:none;margin:0;padding:0}
+.d-hist li{font-size:13px;padding:5px 0;border-bottom:1px dashed var(--line)}
+.d-hist .hd{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;margin-right:4px}
+.hv{color:var(--sub);font-variant-numeric:tabular-nums;margin-left:4px}
+.hv b{color:var(--text)}
+
+/* ---------- 변경 기록 창 ---------- */
+.hist-dlg{width:min(640px,calc(100vw - 32px))}
+.h-head{position:sticky;top:0;z-index:1;display:flex;align-items:center;justify-content:space-between;padding:16px 20px;background:var(--panel);border-bottom:1px solid var(--line)}
+.h-head h2{margin:0;font-size:18px;font-weight:800}
+.h-head .d-close{position:static}
+.h-desc{margin:12px 20px 0;font-size:12px;color:var(--muted)}
+.h-body{padding:8px 20px 20px}
+.h-body .empty{padding:50px 10px}
+.h-entry{margin-top:14px}
+.h-entry h3{margin:0 0 8px;font-size:15px;font-weight:800}
+.h-entry h3 small{font-size:11px;color:var(--muted);font-weight:500;margin-left:4px}
+.h-dec{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin-bottom:6px}
+.h-dec summary{cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px}
+.h-dec summary::-webkit-details-marker{display:none}
+.h-go{border:0;background:none;padding:0;font-weight:700;color:var(--text)}
+.h-go:hover{color:var(--accent)}
+.h-dec li{font-size:13px;padding:5px 0;border-top:1px dashed var(--line)}
+.h-dec ul{margin-top:6px}
+
+/* ---------- 찜 목록 ---------- */
+.wish-tools{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px}
+.wish-tools .dist-hint{margin:0}
+.ghead.nohand{cursor:default}
+.wtbl td .nm{font-weight:700}
+.wtbl th:nth-last-child(-n+2){width:130px}
+.wtbl tbody tr{--c:var(--accent)}
+.wlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
+.witem{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px}
+.whead{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.whead .mini{position:relative;width:84px;height:40px;display:grid;place-items:center;border-radius:6px;background:var(--bg2);overflow:hidden;flex:0 0 auto}
+.whead .mini img{position:absolute;inset:2px;width:calc(100% - 4px);height:calc(100% - 4px);object-fit:contain}
+.whead .mini.portrait img{inset:0;width:100%;height:100%;object-fit:cover;object-position:center 20%}
+.whead .mini .ph svg{width:18px;height:18px}
+.whead .mini .ph span{display:none}
+.whead h3{margin:0;font-size:15px;font-weight:800;flex:1;min-width:0}
+.whead .star{color:var(--muted)}
+.whead .star.on{color:var(--accent)}
+.witem .orow:last-child{margin-bottom:0}
+[hidden]{display:none!important}
+
 /* ---------- 반응형 ---------- */
 @media (max-width:980px){
   .layout{grid-template-columns:1fr}
@@ -222,6 +320,8 @@ dialog::backdrop{background:rgba(4,6,10,.72);backdrop-filter:blur(3px)}
 @media (max-width:640px){
   .topbar-in{gap:10px;padding:0 12px}
   .brand-text,.search kbd{display:none}
+  .search{min-width:0;flex:1 1 0}
+  .tb-btn{height:34px}
   .switch-label{display:none}
   .hero{padding:16px}
   .hero h1{font-size:20px}
@@ -237,5 +337,10 @@ dialog::backdrop{background:rgba(4,6,10,.72);backdrop-filter:blur(3px)}
   .tbl .mini{width:60px}
   .d-stats{grid-template-columns:1fr 1fr}
   .d-stats .d-stat:last-child{grid-column:1/-1}
+  .tb-btn{padding:0 9px}
+  .tb-btn span{display:none}
+  .calc-out{grid-template-columns:1fr 1fr}
+  .wlist{grid-template-columns:1fr}
+  .price-row .dist-hint{width:100%}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}

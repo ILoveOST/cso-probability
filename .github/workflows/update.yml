@@ -1,12 +1,14 @@
 # 카스온라인 확률 자동 업데이트 + 사이트 배포
-# - 매일 오전 9시 17분, 오후 9시 17분(한국 시간)에 공식 확률 페이지를 확인합니다.
-# - 바뀐 내용이 있으면 js/data.js 를 고쳐 저장하고 사이트를 다시 올립니다.
+# - 매일 오전 9시, 오후 7시(한국 시간)에 공식 확률 페이지를 확인합니다.
+#   (GitHub 사정으로 몇 분~수십 분 늦게 시작될 수 있습니다)
+# - 바뀐 내용이 있으면 js/data.js 와 변동 이력 js/history.js 를 고쳐 저장하고 사이트를 다시 올립니다.
+# - 바뀐 게 없으면 사이트 재배포는 건너뜁니다.
 # - Actions 탭에서 "Run workflow" 버튼으로 바로 실행할 수도 있습니다.
 name: 확률 자동 업데이트
 
 on:
   schedule:
-    - cron: '17 0,12 * * *'   # UTC 기준 → 한국 09:17, 21:17
+    - cron: '0 0,10 * * *'    # UTC 기준 → 한국 09:00, 19:00
   workflow_dispatch:
   push:
     branches: [main]
@@ -36,6 +38,7 @@ jobs:
           python-version: '3.12'
 
       - name: 공식 확률 페이지 확인
+        id: update
         if: github.event_name != 'push'
         run: |
           pip install --quiet requests
@@ -55,14 +58,19 @@ jobs:
           fi
 
       - name: 사이트 파일 모으기
+        id: build
+        if: github.event_name != 'schedule' || steps.update.outputs.changed == 'true'
         run: |
           mkdir -p _site
           cp -r index.html css js images _site/
 
       - uses: actions/configure-pages@v5
+        if: steps.build.outcome == 'success'
       - uses: actions/upload-pages-artifact@v3
+        if: steps.build.outcome == 'success'
         with:
           path: _site
       - name: 사이트 배포
         id: deploy
+        if: steps.build.outcome == 'success'
         uses: actions/deploy-pages@v4

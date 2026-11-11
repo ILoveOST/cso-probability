@@ -1,5 +1,5 @@
 /* 카스온라인 해독기 확률 도감 - 화면 로직 (무기·캐릭터 이미지: images/weapons, images/classes)
-   데이터는 js/data.js (LISTS, DECODERS, IMAGES, WIKI_BASE, UPDATED) */
+   데이터는 js/data.js (LISTS, DECODERS, IMAGES, WIKI_BASE, UPDATED), 변동 이력은 js/history.js (HISTORY) */
 (() => {
 'use strict';
 
@@ -29,6 +29,22 @@ const ICONS = {
   box:    '<svg viewBox="0 0 24 24"><path d="M3 8 12 3l9 5v8l-9 5-9-5Z"/><path d="m3 8 9 5 9-5M12 13v8"/></svg>',
   close:  '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>',
   chev:   '<svg viewBox="0 0 24 24" class="chev"><path d="m6 9 6 6 6-6"/></svg>',
+  clock:  '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  star:   '<svg viewBox="0 0 24 24"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2-5.5-2.9-5.5 2.9 1-6.2L3 9.6l6.2-.9Z"/></svg>',
+};
+
+/* ===== 검색 별명 =====
+   영어 이름을 한글로 쳐도 찾을 수 있게 하는 표. 왼쪽(영어 단어, 대문자) → 오른쪽(한글 읽기, 띄어쓰기로 여러 개)
+   예) 'SKULL-7' 은 '스컬7', 'ㅅㅋ7' 로도 검색됩니다. 새 별명은 여기에 한 줄 추가하면 됩니다. */
+const ALIASES = {
+  SKULL:'스컬', JANUS:'야누스', BALROG:'발록', VULCANUS:'불카누스', THANATOS:'타나토스', TURBULENT:'터뷸런트',
+  CROW:'크로우', VICTORY:'빅토리', HECATE:'헤카테', ULTIMAX:'울티맥스', BIZON:'비존 바이존', NEGEV:'네게브',
+  CHARGER:'차저', SPAS:'스파스', UZI:'우지', GROZA:'그로자', CLAYMORE:'클레이모어', STERLING:'스털링',
+  TRACKER:'트래커', FALCON:'팔콘', DESTROYER:'디스트로이어', BOUNCER:'바운서', BUSTER:'버스터', BUNKER:'벙커',
+  NORINCO:'노린코', 'D.EAGLE':'데저트이글 데글', AWP:'에땁', MINE:'마인', BAYONET:'바요넷', SPECIAL:'스페셜',
+};
+/* 아이템 하나에 별명을 따로 붙이고 싶을 때: '기본 이름': '별명1 별명2' */
+const NICKNAMES = {
 };
 
 /* ===== 유틸 ===== */
@@ -46,11 +62,46 @@ const pSum   = p => (Math.round(p * 100) / 100).toFixed(2) + '%';  /* 합계용 
 const oneIn  = p => Math.round(100 / p).toLocaleString('ko-KR');
 const chance = (p, n) => 1 - Math.pow(1 - p/100, n);
 const triesFor = (p, target) => Math.ceil(Math.log(1 - target) / Math.log(1 - p/100));
+const qnorm = s => s.toLowerCase().replace(/[^a-z0-9가-힣ㄱ-ㅎ]/g,'');   /* 검색용 (초성 자음 유지) */
+const CHO = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ';
+const chosung = s => [...s].map(c => { const k = c.charCodeAt(0) - 0xAC00; return k >= 0 && k < 11172 ? CHO[Math.floor(k / 588)] : c; }).join('');
+const ROMAN = { I:1, II:2, III:3, IV:4, V:5, VI:6, VII:7, VIII:8, IX:9, X:10, XI:11, XII:12,
+  'Ⅰ':1, 'Ⅱ':2, 'Ⅲ':3, 'Ⅳ':4, 'Ⅴ':5, 'Ⅵ':6, 'Ⅶ':7, 'Ⅷ':8, 'Ⅸ':9, 'Ⅹ':10 };
+/* 'BALROG-VII' → '발록-7', '썬더 플래시 Ⅱ' → '썬더 플래시 2' */
+const altName = name => name
+  .replace(/(^|[\s\-])(XII|XI|IX|X|VIII|VII|VI|IV|V|III|II|I|[Ⅰ-Ⅹ])(?=$|[\s()\-])/g, (m, a, r) => a + ROMAN[r])
+  .replace(/[A-Za-z][A-Za-z.]*[A-Za-z]|[A-Za-z]/g, w => ALIASES[w.toUpperCase()] || w);
+function searchText(name, base, group){
+  const alt = altName(name), nick = NICKNAMES[base] || '';
+  return [norm(name), qnorm(alt), chosung(qnorm(name)), chosung(qnorm(alt)), qnorm(nick), chosung(qnorm(nick)),
+          norm(group), chosung(qnorm(group))].join(' ');
+}
 const pct = r => r >= 0.99995 ? '≈100%' : (r*100).toFixed(r < 0.01 ? 3 : r < 0.1 ? 2 : 1) + '%';
 const store = {
   get(k, d){ try { return localStorage.getItem(k) ?? d; } catch { return d; } },
   set(k, v){ try { localStorage.setItem(k, v); } catch {} },
+  json(k, d){ try { return JSON.parse(localStorage.getItem(k)) || d; } catch { return d; } },
 };
+/* 금액 표시: 12,000원 / 3.5만원 / 1.25억원 */
+const won = v => !isFinite(v) ? '-'
+  : v >= 1e8 ? (v / 1e8).toLocaleString('ko-KR', { maximumFractionDigits: 2 }) + '억원'
+  : v >= 1e4 ? (v / 1e4).toLocaleString('ko-KR', { maximumFractionDigits: 1 }) + '만원'
+  : Math.round(v).toLocaleString('ko-KR') + '원';
+
+/* ===== 해독 1회 비용 (해독기마다 직접 입력, 이 브라우저에만 저장) ===== */
+const prices = store.json('cso.price', {});
+const priceOf = id => +prices[id] || 0;
+function setPrice(id, v){
+  v = Math.max(0, Math.round(+v || 0));
+  if (v) prices[id] = v; else delete prices[id];
+  store.set('cso.price', JSON.stringify(prices));
+}
+const avgCost = it => priceOf(it.dec) * 100 / it.p;   /* 평균 기대 비용 = 1회 비용 × 기대 횟수 */
+
+/* ===== 찜 목록 (기본 이름 기준: 기간제·무제한 등 같은 무기는 하나로) ===== */
+const wish = store.json('cso.wish', {});   /* { key: 표시 이름 } */
+const isWish = k => Object.prototype.hasOwnProperty.call(wish, k);
+const wishCount = () => Object.keys(wish).length;
 
 /* ===== 데이터 펼치기 ===== */
 const DEC = DECODERS;
@@ -75,11 +126,48 @@ DEC.forEach(D => {
       const t = type === 'mixed' ? (i < weaponCount ? 'weapon' : 'class') : type;
       const base = baseName(name);
       ITEMS.push({ id: ITEMS.length, dec: D.id, name, base, key: norm(base), period: periodOf(name),
-        group, gi, grade, type: t, p: +p, n: norm(name) + ' ' + norm(group) });
+        group, gi, grade, type: t, p: +p, n: searchText(name, base, group) });
     });
   });
 });
 const decItems = id => ITEMS.filter(it => it.dec === id);
+
+/* ===== 확률 변동 이력 ===== */
+const HIST = typeof HISTORY !== 'undefined' ? HISTORY : [];
+const HSTART = typeof HISTORY_START !== 'undefined' ? HISTORY_START : '';
+const BADGE_DAYS = 14;                         /* 최근 14일 안의 변동만 카드에 표시 */
+const RECENT = new Map();                      /* '해독기|아이템' → 가장 최근 변동 */
+const RECENT_DEC = new Map();                  /* 해독기 → 가장 최근 변동 날짜 */
+(() => {
+  const cut = Date.now() - BADGE_DAYS * 864e5;
+  HIST.forEach(e => {                           /* HISTORY 는 최신이 맨 앞 */
+    if (new Date(e.date + 'T23:59:59+09:00') < cut) return;
+    e.changes.forEach(c => {
+      const k = c.dec + '|' + c.item;
+      if (c.item && !RECENT.has(k)) RECENT.set(k, { ...c, date: e.date });
+      if (!RECENT_DEC.has(c.dec)) RECENT_DEC.set(c.dec, e.date);
+    });
+  });
+})();
+const histOf = it => RECENT.get(it.dec + '|' + it.name);
+const HB = { new: ['new', 'NEW'], up: ['up', '▲ 확률 상승'], down: ['down', '▼ 확률 하락'] };
+function histBadge(it){
+  const h = histOf(it); if (!h || !HB[h.type]) return '';
+  const [c, t] = HB[h.type];
+  const tip = h.type === 'new' ? `${h.date} 추가` : `${h.date} ${pShort(+h.from)} → ${pShort(+h.to)}`;
+  return `<span class="hb ${c}" title="${tip}">${t}</span>`;
+}
+function changeText(c){
+  switch (c.type) {
+    case 'new': return `<span class="hb new">NEW</span> ${esc(c.item)} <span class="hv">${pShort(+c.to)}</span>`;
+    case 'removed': return `<span class="hb gone">제외</span> ${esc(c.item)} <span class="hv">이전 ${pShort(+c.from)}</span>`;
+    case 'up': case 'down':
+      return `<span class="hb ${c.type}">${c.type === 'up' ? '▲' : '▼'}</span> ${esc(c.item)} <span class="hv">${pShort(+c.from)} → <b>${pShort(+c.to)}</b></span>`;
+    case 'decoder_new': return '<span class="hb new">NEW</span> 해독기가 새로 추가됐어요';
+    case 'decoder_removed': return '<span class="hb gone">삭제</span> 해독기가 목록에서 빠졌어요';
+  }
+  return '';
+}
 
 function iconFor(it){
   if (it.type === 'weapon') return ICONS.gun;
@@ -111,17 +199,25 @@ document.addEventListener('error', e => {
 
 /* ===== 상태 ===== */
 const S = {
-  dec: DEFAULT_DEC, q: '', all: false, type: 'all', period: 'all', grade: null,
+  dec: DEFAULT_DEC, wish: false, q: '', all: false, type: 'all', period: 'all', grade: null,
   sort: 'group', view: store.get('cso.view', 'card'), closed: new Set(),
 };
 function readHash(){
+  S.wish = location.hash === '#wish';
+  if (S.wish) return;
   const m = location.hash.match(/id=(\d+)/);
   const id = m && DEC_BY_ID[+m[1]] ? +m[1] : null;
   if (id) S.dec = id;
   else S.dec = +store.get('cso.dec', DEFAULT_DEC) in DEC_BY_ID ? +store.get('cso.dec', DEFAULT_DEC) : DEFAULT_DEC;
 }
+function goWish(){
+  S.wish = true; S.q = ''; $('#q').value = ''; S.all = false; $('#allDec').checked = false;
+  history.replaceState(null, '', '#wish');
+  renderAll();
+  window.scrollTo({ top: 0 });
+}
 function go(id, keepSearch){
-  S.dec = id; S.grade = null; S.closed.clear();
+  S.wish = false; S.dec = id; S.grade = null; S.closed.clear();
   if (!keepSearch) { S.all = false; $('#allDec').checked = false; }
   store.set('cso.dec', id);
   history.replaceState(null, '', '#id=' + id);
@@ -136,20 +232,47 @@ function decColor(D){
   return GC[g];
 }
 function renderNav(){
-  const html = NAV.map(([cat, ids]) => `
+  const wishOn = S.wish && !(S.all && S.q);
+  const mine = `<div class="nav-cat"><h3>내 목록</h3>
+      <button class="nav-item wish-nav${wishOn ? ' on' : ''}" data-wishnav style="--c:var(--accent)">
+        <span class="star-i">${ICONS.star}</span><span class="nm">찜 목록</span><span class="ct">${wishCount()}</span></button>
+      <button class="nav-item" data-hist style="--c:#7d8597">
+        <span class="star-i">${ICONS.clock}</span><span class="nm">확률 변경 기록</span><span class="ct">${HIST.length ? HIST[0].date.slice(5) : ''}</span></button>
+    </div>`;
+  const html = mine + NAV.map(([cat, ids]) => `
     <div class="nav-cat"><h3>${cat}</h3>
       ${ids.map(id => { const D = DEC_BY_ID[id]; const n = decItems(id).length;
-        return `<button class="nav-item${id===S.dec && !(S.all && S.q)?' on':''}" data-id="${id}" style="--c:${decColor(D)}">
+        return `<button class="nav-item${id===S.dec && !S.wish && !(S.all && S.q)?' on':''}" data-id="${id}" style="--c:${decColor(D)}">
           <span class="dot"></span><span class="nm">${esc(D.name)}</span><span class="ct">${n}</span></button>`; }).join('')}
     </div>`).join('');
   $('#sidebar').innerHTML = html;
-  $('#decSelect').innerHTML = NAV.map(([cat, ids]) =>
-    `<optgroup label="${cat}">${ids.map(id => `<option value="${id}"${id===S.dec?' selected':''}>${esc(DEC_BY_ID[id].name)} (${decItems(id).length})</option>`).join('')}</optgroup>`).join('');
+  $('#decSelect').innerHTML = `<option value="wish"${S.wish ? ' selected' : ''}>★ 찜 목록 (${wishCount()})</option>` + NAV.map(([cat, ids]) =>
+    `<optgroup label="${cat}">${ids.map(id => `<option value="${id}"${id===S.dec && !S.wish?' selected':''}>${esc(DEC_BY_ID[id].name)} (${decItems(id).length})</option>`).join('')}</optgroup>`).join('');
 }
 
 /* ===== 해독기 소개 ===== */
 function renderHero(){
   const hero = $('#hero');
+  $('#toolbar').hidden = S.wish && !(S.all && S.q);
+  if (S.wish && !(S.all && S.q)) {
+    const keys = Object.keys(wish);
+    const decs = new Set(ITEMS.filter(it => isWish(it.key)).map(it => it.dec));
+    hero.style.setProperty('--c', '#ffb53d');
+    hero.innerHTML = `
+      <div class="hero-top">
+        <div><div class="kicker">내 목록 · 이 브라우저에만 저장돼요</div><h1>★ 찜 목록</h1></div>
+        <div class="facts">
+          <div class="fact"><div class="k">찜한 아이템</div><div class="v">${keys.length}개</div></div>
+          <div class="fact"><div class="k">나오는 해독기</div><div class="v">${decs.size}종</div></div>
+        </div>
+      </div>
+      <div class="wish-tools">
+        <div class="seg" role="group" aria-label="기간">${[['all','모든 기간'],['perm','무제한만'],['temp','기간제만']].map(([v, t]) =>
+          `<button data-wp="${v}" class="${S.period === v ? 'on' : ''}">${t}</button>`).join('')}</div>
+        <span class="dist-hint">카드의 ☆를 누르면 여기에 모여요. 같은 무기는 기간제·무제한을 함께 묶어요.</span>
+      </div>`;
+    return;
+  }
   if (S.all && S.q) {
     hero.style.setProperty('--c', '#ffb53d');
     hero.innerHTML = `<div class="hero-top"><div><div class="kicker">전체 해독기 검색</div><h1>“${esc(S.q)}” 검색 결과</h1></div></div>`;
@@ -167,7 +290,7 @@ function renderHero(){
   hero.innerHTML = `
     <div class="hero-top">
       <div>
-        <div class="kicker">${esc(NAV.find(([,ids]) => ids.includes(D.id))[0])} 해독기 · <a href="https://csonline.nexon.com/Probability/Index?id=${D.id}" target="_blank" rel="noopener">공식 확률표 ↗</a></div>
+        <div class="kicker">${esc(NAV.find(([,ids]) => ids.includes(D.id))[0])} 해독기 · <a href="https://csonline.nexon.com/Probability/Index?id=${D.id}" target="_blank" rel="noopener">공식 확률표 ↗</a>${RECENT_DEC.has(D.id) ? ` · <button class="kick-hist" data-hist>최근 확률 변동 ${RECENT_DEC.get(D.id)}</button>` : ''}</div>
         <h1>${esc(D.name)}</h1>
       </div>
       <div class="facts">
@@ -175,6 +298,10 @@ function renderHero(){
         <div class="fact"><div class="k">${weapons ? '무기' : '캐릭터'}</div><div class="v">${weapons || items.filter(i => i.type === 'class').length}종</div></div>
         <div class="fact"><div class="k">${esc(top)} 등급 합계</div><div class="v" style="color:${GC[top]}">${pSum(byG[top])}</div></div>
       </div>
+    </div>
+    <div class="price-row">
+      <label>해독 1회 비용 <input id="price" type="number" min="0" step="100" inputmode="numeric" placeholder="예: 3000" value="${priceOf(D.id) || ''}"> 원</label>
+      <span class="dist-hint">해독기+해독키 1회 가격을 넣으면 아이템마다 평균 비용이 나와요. (이 브라우저에만 저장)</span>
     </div>
     <div class="dist">
       <div class="dist-bar">${gs.map(g => `<span style="--c:${GC[g]};width:${byG[g]/total*100}%;${S.grade && S.grade!==g?'opacity:.25':''}" title="${g} ${pSum(byG[g])}"></span>`).join('')}</div>
@@ -188,7 +315,7 @@ function renderHero(){
 
 /* ===== 결과 ===== */
 function filtered(){
-  const q = norm(S.q);
+  const q = qnorm(S.q);
   const global = S.all && q;
   return ITEMS.filter(it =>
     (global || it.dec === S.dec) &&
@@ -205,14 +332,19 @@ function sortItems(list){
   }[S.sort] || ((a,b) => b.p - a.p || a.id - b.id);
   return [...list].sort(by);
 }
+const starHTML = (it, cls = 'star') =>
+  `<span class="${cls}${isWish(it.key) ? ' on' : ''}" data-wish="${it.key}" data-wname="${esc(it.base)}" role="button" tabindex="0" title="찜하기" aria-label="찜하기">${ICONS.star}</span>`;
 function cardHTML(it, opt = {}){
+  const pr = priceOf(it.dec);
   return `<button class="card" data-item="${it.id}" style="--c:${GC[it.grade]}">
-    ${thumbHTML(it).replace('</div></div>', `</div><span class="tag grade">${esc(it.grade)}</span>${it.period ? `<span class="tag period">${it.period}</span>` : ''}</div>`)}
+    ${thumbHTML(it).replace('</div></div>', `</div><span class="tag grade">${esc(it.grade)}</span>${it.period ? `<span class="tag period">${it.period}</span>` : ''}${starHTML(it)}</div>`)}
     <div class="cbody">
       ${opt.dec ? `<div class="cdec">${esc(DEC_BY_ID[it.dec].name)}</div>` : ''}
+      ${histBadge(it)}
       <div class="cname">${esc(it.name)}</div>
       ${opt.group ? `<div class="cgroup">${esc(it.group)}</div>` : ''}
       <div class="cprob"><b>${pShort(it.p)}</b><small>1/${oneIn(it.p)}회</small></div>
+      ${pr ? `<div class="ccost">평균 비용 <b>≈ ${won(avgCost(it))}</b></div>` : ''}
     </div>
   </button>`;
 }
@@ -221,20 +353,21 @@ function tableHTML(list, opt = {}){
       <th style="width:100px">이미지</th><th>아이템</th>
       ${opt.dec ? '<th class="hide-sm">해독기</th>' : ''}
       ${opt.group ? '<th class="hide-sm">그룹</th>' : ''}
-      <th class="num">확률</th><th class="num hide-sm">기대 횟수</th></tr></thead><tbody>
+      <th class="num">확률</th><th class="num hide-sm">기대 횟수 · 비용</th></tr></thead><tbody>
     ${list.map(it => `<tr data-item="${it.id}" style="--c:${GC[it.grade]}">
       <td>${thumbHTML(it, 'mini')}</td>
-      <td><span class="gd">${esc(it.grade)}</span><span class="nm">${esc(it.name.replace(/\s*\(\d+일\)$/, ''))}</span>${it.period ? `<span class="pd">${it.period}</span>` : ''}</td>
+      <td>${starHTML(it, 'star sm')}<span class="gd">${esc(it.grade)}</span><span class="nm">${esc(it.name.replace(/\s*\(\d+일\)$/, ''))}</span>${it.period ? `<span class="pd">${it.period}</span>` : ''}${histBadge(it)}</td>
       ${opt.dec ? `<td class="sm hide-sm">${esc(DEC_BY_ID[it.dec].name)}</td>` : ''}
       ${opt.group ? `<td class="sm hide-sm">${esc(it.group)}</td>` : ''}
       <td class="num p">${pShort(it.p)}</td>
-      <td class="num sm hide-sm">1/${oneIn(it.p)}회</td></tr>`).join('')}
+      <td class="num sm hide-sm">1/${oneIn(it.p)}회${priceOf(it.dec) ? `<br><span class="cost">≈ ${won(avgCost(it))}</span>` : ''}</td></tr>`).join('')}
     </tbody></table>`;
 }
 function renderResults(){
   const list = filtered();
-  const global = S.all && norm(S.q);
+  const global = S.all && qnorm(S.q);
   const box = $('#results');
+  if (S.wish && !global) return renderWish(box);
 
   // 적용된 필터 표시
   const chips = [];
@@ -274,11 +407,89 @@ function renderResults(){
   }).join('');
 }
 
+/* ===== 찜 목록 화면 ===== */
+function renderWish(box){
+  $('#activeFilters').innerHTML = '';
+  const keys = Object.keys(wish);
+  if (!keys.length) {
+    box.innerHTML = `<div class="empty"><b>아직 찜한 아이템이 없어요</b>아이템 카드 오른쪽 아래의 ☆ 또는 상세 창의 ☆를 누르면 여기에 모여요.</div>`;
+    return;
+  }
+  const pOk = it => S.period === 'all' || (S.period === 'perm' ? !it.period : !!it.period);
+  const pool = ITEMS.filter(it => isWish(it.key) && pOk(it));
+  const byDec = new Map();
+  pool.forEach(it => { if (!byDec.has(it.dec)) byDec.set(it.dec, []); byDec.get(it.dec).push(it); });
+  const rows = [...byDec].map(([dec, arr]) => ({ dec, arr, sum: arr.reduce((a, b) => a + b.p, 0) }))
+    .sort((a, b) => b.sum - a.sum);
+  const cmp = rows.length ? `
+    <section class="group" style="--c:var(--accent)">
+      <div class="ghead nohand"><span class="bar"></span><h2>해독기별 비교</h2>
+        <span class="meta">해독 1번에 찜한 아이템 중 하나라도 나올 확률</span></div>
+      <table class="tbl wtbl"><thead><tr><th>해독기</th><th class="hide-sm">들어 있는 찜 아이템</th>
+        <th class="num">1회 확률</th><th class="num">평균 횟수 · 비용</th></tr></thead><tbody>
+      ${rows.map(r => { const pr = priceOf(r.dec), names = [...new Set(r.arr.map(i => i.base))];
+        return `<tr data-goto="${r.dec}" style="--c:${decColor(DEC_BY_ID[r.dec])}">
+          <td><span class="nm">${esc(DEC_BY_ID[r.dec].name)}</span></td>
+          <td class="sm hide-sm">${names.map(esc).join(', ')} <span class="muted">(${r.arr.length}종)</span></td>
+          <td class="num p">${pShort(r.sum)}</td>
+          <td class="num sm">1/${oneIn(r.sum)}회<br><span class="cost">${pr ? '≈ ' + won(pr * 100 / r.sum) : '가격 미입력'}</span></td></tr>`; }).join('')}
+      </tbody></table>
+      <p class="note">비용은 각 해독기 화면 위쪽 “해독 1회 비용”에 넣은 가격으로 계산해요.</p>
+    </section>` : '';
+  const each = keys.map(k => {
+    const its = ITEMS.filter(it => it.key === k && pOk(it)).sort((a, b) => b.p - a.p);
+    const any = ITEMS.find(it => it.key === k);
+    const head = any || { key: k, base: wish[k], name: wish[k], type: 'weapon', grade: '기타' };
+    return `<section class="witem" style="--c:${GC[head.grade]}">
+      <div class="whead">${thumbHTML(head, 'mini')}<h3>${esc(head.base)}</h3>${starHTML(head)}</div>
+      ${its.length ? its.map(o => `<button class="orow" data-item="${o.id}" style="--c:${GC[o.grade]}">
+          <span class="on">${esc(DEC_BY_ID[o.dec].name)}</span>
+          <span class="og">${esc(o.name)} · ${esc(o.group || '(이름 없음)')}${priceOf(o.dec) ? ` · 평균 ≈ ${won(avgCost(o))}` : ''}</span>
+          <span class="op">${pShort(o.p)}<small>1/${oneIn(o.p)}회</small></span></button>`).join('')
+        : `<div class="note">${any ? '이 기간 조건에 맞는 아이템이 없어요.' : '지금은 어느 해독기에도 들어 있지 않아요.'}</div>`}
+    </section>`;
+  }).join('');
+  box.innerHTML = cmp + `<div class="wlist">${each}</div>`;
+}
+function toggleWish(k, name){
+  if (isWish(k)) delete wish[k]; else wish[k] = name;
+  store.set('cso.wish', JSON.stringify(wish));
+  document.querySelectorAll(`[data-wish="${k}"]`).forEach(el => el.classList.toggle('on', isWish(k)));
+  renderNav();
+  if (S.wish) { renderHero(); renderResults(); }
+}
+
+/* ===== 변경 기록 창 ===== */
+const hdlg = $('#histDlg');
+function openHist(){
+  const body = HIST.length ? HIST.map(e => {
+    const byDec = new Map();
+    e.changes.forEach(c => { if (!byDec.has(c.dec)) byDec.set(c.dec, { name: c.decName, list: [] }); byDec.get(c.dec).list.push(c); });
+    return `<section class="h-entry"><h3>${e.date} <small>${e.time || ''} 확인</small></h3>
+      ${[...byDec].map(([dec, d]) => `<details class="h-dec"${d.list.length <= 12 ? ' open' : ''}>
+        <summary>${DEC_BY_ID[dec] ? `<button class="h-go" data-goto="${dec}">${esc(d.name)} ↗</button>` : `<b>${esc(d.name)}</b>`}
+          <span class="muted">${d.list.length}건</span></summary>
+        <ul>${d.list.map(c => `<li>${changeText(c)}</li>`).join('')}</ul></details>`).join('')}
+    </section>`; }).join('')
+    : `<div class="empty"><b>아직 기록된 변동이 없어요</b>${HSTART ? HSTART + '부터 ' : ''}공식 확률표가 바뀌면 자동으로 여기에 쌓여요.</div>`;
+  hdlg.innerHTML = `<div class="h-head"><h2 id="hTitle">확률 변경 기록</h2>
+      <button class="d-close" data-close aria-label="닫기">${ICONS.close}</button></div>
+    <p class="h-desc">하루 두 번(오전 9시·오후 7시) 공식 확률표를 확인해서 달라진 점만 기록해요. 카드에는 최근 ${BADGE_DAYS}일 안의 변동이 NEW / ▲ / ▼ 로 표시돼요.</p>
+    <div class="h-body">${body}</div>`;
+  if (!hdlg.open) hdlg.showModal();
+  hdlg.scrollTop = 0;
+}
+hdlg.addEventListener('click', e => {
+  if (e.target === hdlg || e.target.closest('[data-close]')) return hdlg.close();
+  const g = e.target.closest('[data-goto]');
+  if (g) { e.preventDefault(); hdlg.close(); go(+g.dataset.goto); }
+});
+
 function syncControls(){
   for (const [sel, v] of [['#typeSeg', S.type], ['#periodSeg', S.period], ['#viewSeg', S.view]])
     document.querySelectorAll(sel + ' button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
   $('#sort').value = S.sort;
-  document.title = (S.all && S.q ? `“${S.q}” 검색` : DEC_BY_ID[S.dec].name) + ' 확률 | 카스온라인 해독기 확률 도감';
+  document.title = (S.all && S.q ? `“${S.q}” 검색` : S.wish ? '찜 목록' : DEC_BY_ID[S.dec].name) + ' 확률 | 카스온라인 해독기 확률 도감';
 }
 function renderAll(){ renderNav(); renderHero(); syncControls(); renderResults(); }
 
@@ -289,28 +500,42 @@ function openDetail(id){
   const D = DEC_BY_ID[it.dec];
   const others = ITEMS.filter(o => o.key === it.key).sort((a,b) => b.p - a.p);
   const tries = +store.get('cso.tries', 100) || 100;
+  const pr = priceOf(it.dec);
+  const costLine = n => pr ? `<small>≈ ${won(pr * n)}</small>` : '';
+  const myHist = [];
+  HIST.forEach(e => e.changes.forEach(c => { if (c.item && norm(baseName(c.item)) === it.key) myHist.push({ ...c, date: e.date }); }));
   dlg.style.setProperty('--c', GC[it.grade]);
   dlg.innerHTML = `
     ${thumbHTML(it, 'd-hero').replace(/<\/div><\/div>$/, `</div><button class="d-close" data-close aria-label="닫기">${ICONS.close}</button></div>`)}
     <div class="d-body">
-      <div class="d-title"><span class="tag grade">${esc(it.grade)}</span>${it.period ? `<span class="tag period">${it.period}</span>` : ''}<h2 id="dTitle">${esc(it.name)}</h2></div>
+      <div class="d-title"><span class="tag grade">${esc(it.grade)}</span>${it.period ? `<span class="tag period">${it.period}</span>` : ''}<h2 id="dTitle">${esc(it.name)}</h2>${starHTML(it, 'star big')}</div>
       <div class="d-sub">${esc(D.name)} · ${esc(it.group || '(이름 없음)')}</div>
       <div class="d-stats">
         <div class="d-stat"><div class="k">획득 확률 (공식)</div><div class="v c">${pFull(it.p)}</div></div>
-        <div class="d-stat"><div class="k">평균 기대 횟수</div><div class="v">${oneIn(it.p)}회</div></div>
-        <div class="d-stat"><div class="k">50% / 90% 확률로 얻으려면</div><div class="v">${triesFor(it.p,.5).toLocaleString()} / ${triesFor(it.p,.9).toLocaleString()}회</div></div>
+        <div class="d-stat"><div class="k">평균 기대 횟수${pr ? ' · 비용' : ''}</div><div class="v">${oneIn(it.p)}회${costLine(100 / it.p)}</div></div>
+        <div class="d-stat"><div class="k">50% / 90% 확률로 얻으려면</div><div class="v">${triesFor(it.p,.5).toLocaleString()} / ${triesFor(it.p,.9).toLocaleString()}회${pr ? `<small>≈ ${won(pr * triesFor(it.p,.5))} / ${won(pr * triesFor(it.p,.9))}</small>` : ''}</div></div>
       </div>
       <div class="d-calc">
-        <h3>해독 횟수 계산기</h3>
+        <h3>해독 횟수 · 비용 계산기</h3>
         <div class="calc-row">
           <input type="number" id="calcN" min="1" max="1000000" value="${tries}" aria-label="해독 횟수"> 회
           ${[10, 50, 100, 500, 1000].map(n => `<button class="pre" data-n="${n}">${n}회</button>`).join('')}
         </div>
+        <div class="calc-row money">
+          <label>1회 비용 <input type="number" id="calcPrice" min="0" step="100" inputmode="numeric" placeholder="예: 3000" value="${pr || ''}"> 원</label>
+          <label>예산 <input type="number" id="calcBudget" min="0" step="1000" inputmode="numeric" placeholder="예: 100000"> 원</label>
+        </div>
         <div class="calc-out">
           <div>1개 이상 얻을 확률<b id="calcP"></b></div>
           <div>평균 획득 개수<b id="calcE"></b></div>
+          <div>총 비용<b id="calcC"></b></div>
         </div>
         <div class="meter"><i id="calcM"></i></div>
+      </div>
+      <div class="d-hist">
+        <h3>확률 변동 기록</h3>
+        ${myHist.length ? `<ul>${myHist.map(c => `<li><span class="hd">${c.date}</span> <span class="muted">${esc(c.decName)}</span> ${changeText(c)}</li>`).join('')}</ul>`
+          : `<div class="note">${HSTART ? HSTART + '부터 기록 중 · ' : ''}아직 바뀐 적 없어요.</div>`}
       </div>
       <div class="d-other">
         <h3>이 아이템이 나오는 해독기 (${others.length})</h3>
@@ -321,30 +546,43 @@ function openDetail(id){
           </button>`).join('')}
       </div>
     </div>`;
-  const upd = () => {
+  const upd = fromBudget => {
+    const price = Math.max(0, +$('#calcPrice').value || 0);
+    if (fromBudget && price) $('#calcN').value = Math.max(1, Math.floor((+$('#calcBudget').value || 0) / price));
     const n = Math.max(1, Math.min(1e6, +$('#calcN').value || 1));
     store.set('cso.tries', n);
+    if (!fromBudget) $('#calcBudget').value = price ? n * price : '';
     const r = chance(it.p, n);
     $('#calcP').textContent = pct(r);
     $('#calcE').textContent = (n * it.p / 100).toLocaleString('ko-KR', { maximumFractionDigits: 3 }) + '개';
+    $('#calcC').textContent = price ? won(n * price) : '가격을 넣어 주세요';
     $('#calcM').style.width = (r * 100).toFixed(2) + '%';
   };
-  $('#calcN').addEventListener('input', upd);
-  dlg.querySelectorAll('.pre').forEach(b => b.onclick = () => { $('#calcN').value = b.dataset.n; upd(); });
-  upd();
+  $('#calcN').addEventListener('input', () => upd(false));
+  $('#calcBudget').addEventListener('input', () => upd(true));
+  $('#calcPrice').addEventListener('input', () => { setPrice(it.dec, $('#calcPrice').value); dlgDirty = true; upd(false); });
+  dlg.querySelectorAll('.pre').forEach(b => b.onclick = () => { $('#calcN').value = b.dataset.n; upd(false); });
+  upd(false);
   if (!dlg.open) dlg.showModal();
   dlg.scrollTop = 0;
 }
+let dlgDirty = false;   /* 상세 창에서 가격을 바꾸면 닫을 때 화면 다시 그리기 */
+dlg.addEventListener('close', () => { if (dlgDirty) { dlgDirty = false; renderAll(); } });
 dlg.addEventListener('click', e => {
   if (e.target === dlg || e.target.closest('[data-close]')) return dlg.close();
+  const w = e.target.closest('[data-wish]'); if (w) return toggleWish(w.dataset.wish, w.dataset.wname);
   const row = e.target.closest('.orow:not(.cur)');
   if (row) { dlg.close(); go(+row.dataset.goto, false);
     requestAnimationFrame(() => document.querySelector(`[data-item="${row.dataset.oid}"]`)?.scrollIntoView({ block: 'center' })); }
 });
 
 /* ===== 이벤트 ===== */
-$('#sidebar').addEventListener('click', e => { const b = e.target.closest('.nav-item'); if (b) go(+b.dataset.id); });
-$('#decSelect').addEventListener('change', e => go(+e.target.value));
+$('#sidebar').addEventListener('click', e => {
+  const b = e.target.closest('.nav-item'); if (!b) return;
+  if ('wishnav' in b.dataset) goWish(); else if ('hist' in b.dataset) openHist(); else go(+b.dataset.id);
+});
+$('#decSelect').addEventListener('change', e => e.target.value === 'wish' ? goWish() : go(+e.target.value));
+$('#histBtn').addEventListener('click', openHist);
 let qTimer;
 $('#q').addEventListener('input', e => { clearTimeout(qTimer); qTimer = setTimeout(() => { S.q = e.target.value.trim(); renderNav(); renderHero(); syncControls(); renderResults(); }, 120); });
 $('#allDec').addEventListener('change', e => { S.all = e.target.checked; renderAll(); });
@@ -352,7 +590,15 @@ for (const [sel, key] of [['#typeSeg','type'], ['#periodSeg','period'], ['#viewS
   $(sel).addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return;
     S[key] = b.dataset.v; if (key === 'view') store.set('cso.view', S.view); syncControls(); renderResults(); });
 $('#sort').addEventListener('change', e => { S.sort = e.target.value; renderResults(); });
+let priceTimer;
+$('#hero').addEventListener('input', e => {
+  if (e.target.id !== 'price') return;
+  clearTimeout(priceTimer);
+  priceTimer = setTimeout(() => { setPrice(S.dec, e.target.value); renderResults(); }, 250);
+});
 $('#hero').addEventListener('click', e => {
+  if (e.target.closest('[data-hist]')) return openHist();
+  const wp = e.target.closest('[data-wp]'); if (wp) { S.period = wp.dataset.wp; renderHero(); renderResults(); return; }
   const lg = e.target.closest('.lg'); if (lg) { S.grade = S.grade === lg.dataset.g ? null : lg.dataset.g; renderHero(); renderResults(); return; }
   const j = e.target.closest('[data-gi]'); if (j) {
     const gi = +j.dataset.gi;
@@ -371,22 +617,26 @@ $('#activeFilters').addEventListener('click', e => {
   renderAll();
 });
 $('#results').addEventListener('click', e => {
+  const w = e.target.closest('[data-wish]');
+  if (w) { e.preventDefault(); e.stopPropagation(); return toggleWish(w.dataset.wish, w.dataset.wname); }
+  const g = e.target.closest('tr[data-goto]'); if (g) return go(+g.dataset.goto);
   const h = e.target.closest('[data-toggle]');
   if (h) { const gi = +h.dataset.toggle; S.closed.has(gi) ? S.closed.delete(gi) : S.closed.add(gi);
     h.parentElement.classList.toggle('closed'); h.setAttribute('aria-expanded', !S.closed.has(gi)); return; }
   const c = e.target.closest('[data-item]'); if (c) openDetail(+c.dataset.item);
 });
 $('#results').addEventListener('keydown', e => {
-  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-toggle]')) { e.preventDefault(); e.target.click(); }
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-toggle], [data-wish]')) { e.preventDefault(); e.stopPropagation(); e.target.click(); }
 });
 document.addEventListener('keydown', e => {
-  if (e.key === '/' && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && !dlg.open) { e.preventDefault(); $('#q').focus(); }
+  if (e.key === '/' && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && !dlg.open && !hdlg.open) { e.preventDefault(); $('#q').focus(); }
 });
 window.addEventListener('hashchange', () => { readHash(); renderAll(); });
 document.querySelector('.brand').addEventListener('click', e => { e.preventDefault(); S.q = ''; $('#q').value = ''; go(DEFAULT_DEC); });
 
 /* ===== 시작 ===== */
 $('#updated').textContent = UPDATED;
+if (HIST.length && RECENT_DEC.size) $('#histBtn').classList.add('fresh');
 if (typeof LAST_CHANGES !== 'undefined' && LAST_CHANGES && (LAST_CHANGES.changed.length || LAST_CHANGES.removed.length)) {
   const parts = [];
   if (LAST_CHANGES.changed.length) parts.push('변경: ' + LAST_CHANGES.changed.join(', '));

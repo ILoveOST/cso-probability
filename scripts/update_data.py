@@ -29,6 +29,8 @@ UA = 'Mozilla/5.0 (compatible; cso-probability-bot/1.0; +https://github.com/ILov
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_JS = os.path.join(ROOT, 'js', 'data.js')
+HISTORY_JS = os.path.join(ROOT, 'js', 'history.js')
+HISTORY_START = '2026-11-11'      # 이 날부터 변동 이력을 기록
 SUM_TOLERANCE = 0.05          # 확률 합계 허용 오차(%) — 공식 표기가 소수점 5자리라 생기는 반올림 오차
 KST = datetime.timezone(datetime.timedelta(hours=9))
 
@@ -341,6 +343,50 @@ def fetch_wiki_images(bases):
     return out
 
 
+# ----------------------------------------------------------------- 변동 이력
+def load_history():
+    if not os.path.exists(HISTORY_JS):
+        return []
+    s = open(HISTORY_JS, encoding='utf-8').read()
+    m = re.search(r'const HISTORY = (\[.*?\]);\n', s, re.S)
+    return json.loads(m.group(1)) if m else []
+
+
+def write_history(hist):
+    js = ('/* 확률 변동 이력 - scripts/update_data.py 가 확률이 바뀔 때마다 맨 앞에 추가합니다.\n'
+          '   type: new(새 아이템) removed(빠진 아이템) up/down(확률 변경) decoder_new/decoder_removed */\n'
+          f"const HISTORY_START = '{HISTORY_START}';\n"
+          'const HISTORY = [\n' + ',\n'.join(
+              ' {"date": %s, "time": %s, "changes": [\n%s\n ]}' % (
+                  json.dumps(e['date']), json.dumps(e.get('time', '')),
+                  ',\n'.join('  ' + json.dumps(c, ensure_ascii=False) for c in e['changes']))
+              for e in hist) + '\n];\n')
+    with open(HISTORY_JS, 'w', encoding='utf-8') as f:
+        f.write(js)
+
+
+def diff_items(old_dec, old_lists, new_dec, new_lists):
+    """해독기 하나의 아이템별 확률 비교 → 변경 목록"""
+    def items(D, L):
+        out = {}
+        for r in D['rows']:
+            for n in L[r[2]].split('|'):
+                out.setdefault(n, (r[1], r[0]))
+        return out
+    a, b = items(old_dec, old_lists), items(new_dec, new_lists)
+    ch = []
+    for n, (p, g) in b.items():
+        if n not in a:
+            ch.append({'type': 'new', 'item': n, 'group': g, 'to': p})
+        elif float(a[n][0]) != float(p):
+            ch.append({'type': 'up' if float(p) > float(a[n][0]) else 'down',
+                       'item': n, 'group': g, 'from': a[n][0], 'to': p})
+    for n, (p, g) in a.items():
+        if n not in b:
+            ch.append({'type': 'removed', 'item': n, 'group': g, 'from': p})
+    return ch
+
+
 # ----------------------------------------------------------------- 메인
 def write_data(lists, decoders, images, updated, last_changes):
     js = ('/* 카스온라인 해독기 확률 데이터 - 공식 확률형 아이템 페이지에서 자동 수집 (scripts/update_data.py)\n'
@@ -474,8 +520,10 @@ def main():
         data_changed = True
     if not data_changed and images == old['IMAGES']:
         log('변경 없음')
+        set_output(False)
         return
-    today = datetime.datetime.now(KST).strftime('%Y-%m-%d')
+    now = datetime.datetime.now(KST)
+    today = now.strftime('%Y-%m-%d')
     updated = today if data_changed else old['UPDATED']
     last = {'date': today, 'changed': changed, 'removed': removed} if data_changed else old['LAST_CHANGES']
     log('바뀐 해독기:', ', '.join(changed) or '-', '| 사라진 해독기:', ', '.join(removed) or '-')
@@ -484,6 +532,32 @@ def main():
         return
     write_data(lists, decoders, images, updated, last)
     log('js/data.js 갱신 완료')
+    if data_changed and old['DECODERS']:
+        entries = []
+        new_by = {D['id']: D for D in decoders}
+        for D in decoders:
+            if D['id'] not in old_by:
+                entries.append({'dec': D['id'], 'decName': D['name'], 'type': 'decoder_new'})
+            elif D['name'] in changed:
+                for c in diff_items(old_by[D['id']], old['LISTS'], D, lists):
+                    entries.append({'dec': D['id'], 'decName': D['name'], **c})
+        for i, D in old_by.items():
+            if i not in new_by:
+                entries.append({'dec': i, 'decName': D['name'], 'type': 'decoder_removed'})
+        if entries:
+            hist = load_history()
+            hist.insert(0, {'date': today, 'time': now.strftime('%H:%M'), 'changes': entries})
+            write_history(hist)
+            log(f'변동 이력 {len(entries)}건 기록')
+    set_output(True)
+
+
+def set_output(changed):
+    """GitHub Actions에 '바뀜 여부'를 알려서, 안 바뀌었으면 배포를 건너뛰게 함"""
+    path = os.environ.get('GITHUB_OUTPUT')
+    if path:
+        with open(path, 'a') as f:
+            f.write(f'changed={"true" if changed else "false"}\n')
 
 
 if __name__ == '__main__':
