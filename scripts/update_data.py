@@ -436,10 +436,17 @@ def main():
     if args.no_memory:
         known_type, known_grade = {}, {}
 
-    menu = parse_menu(page('menu'))
+    menu_html = page('menu')
+    menu = parse_menu(menu_html)
     if len(menu) < 5:
         raise SystemExit(f'해독기 목록을 제대로 읽지 못함 ({len(menu)}개) — 넥슨 페이지 구조가 바뀌었는지 확인 필요')
     log(f'해독기 {len(menu)}개 확인')
+    # 해독기 말고 다른 확률 페이지(상자·강화 등)가 생겼는지 기록만 남김
+    other = sorted({(h, re.sub(r'<[^>]+>|\s+', ' ', t).strip()) for h, t in
+                    re.findall(r'<a[^>]+href="([^"]*Probab[^"]*)"[^>]*>(.*?)</a>', menu_html, re.S | re.I)
+                    if '해독기' not in t})
+    if other:
+        log('해독기 외 확률 링크: ' + ' / '.join(f'{t} ({h})' for h, t in other))
 
     # 1) 모든 해독기 읽기 + 합계 검사
     all_segs, names, errors = {}, {}, []
