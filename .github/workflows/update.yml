@@ -53,7 +53,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.fill_images
         run: |
           pip install --quiet requests
-          python scripts/fill_images.py
+          python scripts/fill_images.py --why
 
       - name: 넥슨 NOW 저장 파일 반영
         id: nownx

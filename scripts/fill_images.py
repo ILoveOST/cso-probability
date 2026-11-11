@@ -170,7 +170,7 @@ def main():
             extra[b] = got
             found += 1
             log(f'  찾음: {b} ← 위키 "{hit[0]}" ({hit[1]})')
-    # 못 찾은 것: 위키 검색 후보만 기록 (자동 연결 안 함)
+    # 못 찾은 것: 위키 검색 후보와, 후보 문서에서 한국 이름이 적힌 줄을 기록 (자동 연결 안 함)
     for b in miss:
         try:
             r = U.wiki_api(action='query', list='search', srsearch=b, srlimit=3)
@@ -178,6 +178,13 @@ def main():
         except Exception:  # noqa: BLE001
             cands = []
         log(f'  못 찾음: {b}' + (f'  (위키 검색 후보: {", ".join(cands)})' if cands else ''))
+        if cands and '--why' in sys.argv:
+            r = U.wiki_api(action='query', prop='revisions', rvprop='content', rvslots='main', titles='|'.join(cands))
+            for pg in r.get('query', {}).get('pages', {}).values():
+                t = (pg.get('revisions') or [{}])[0].get('slots', {}).get('main', {}).get('*', '')
+                lines = [ln.strip()[:220] for ln in t.split('\n') if b in ln][:2]
+                pos = t.find(b)
+                log(f'      [{pg["title"]}] 위치 {pos}/{len(t)} :: ' + ' ⏎ '.join(lines))
         time.sleep(0.2)
     with open(EXTRA_JS, 'w', encoding='utf-8') as fp:
         fp.write('/* 추가 이미지 연결 - scripts/fill_images.py 가 위키에서 한국 이름이 정확히 같은 문서를 찾아 만듭니다.\n'
