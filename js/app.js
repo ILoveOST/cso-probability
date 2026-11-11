@@ -106,21 +106,9 @@ const wishCount = () => Object.keys(wish).length;
 /* ===== 데이터 펼치기 ===== */
 const DEC = DECODERS;
 const DEC_BY_ID = Object.fromEntries(DEC.map(d => [d.id, d]));
-/* 자동 업데이트로 새 해독기가 생기면 이름으로 분류해 넣고, 사라진 해독기는 목록에서 뺌 */
-const NAV = (() => {
-  const nav = NAV_BASE.map(([c, ids]) => [c, ids.filter(id => DEC_BY_ID[id])]);
-  const known = new Set(NAV_BASE.flatMap(([, ids]) => ids));
-  for (const D of DEC) {
-    if (known.has(D.id)) continue;
-    const cat = /PC방/.test(D.name) ? 'PC방' : /클래스/.test(D.name) ? '클래스'
-      : /에픽|초월|유니크|레어|Top/.test(D.name) ? '무기' : '기타';
-    nav.find(([c]) => c === cat)[1].push(D.id);
-  }
-  return nav.filter(([, ids]) => ids.length);
-})();
 const DEFAULT_DEC = DEC_BY_ID[9616] ? 9616 : DEC[0].id;
 const ITEMS = [];
-DEC.forEach(D => {
+function addItems(D){
   D.rows.forEach(([group, p, li, grade, type, weaponCount = 5], gi) => {
     LISTS[li].split('|').forEach((name, i) => {
       const t = type === 'mixed' ? (i < weaponCount ? 'weapon' : 'class') : type;
@@ -129,7 +117,73 @@ DEC.forEach(D => {
         group, gi, grade, type: t, p: +p, n: searchText(name, base, group) });
     });
   });
-});
+}
+DEC.forEach(addItems);
+
+/* ===== 넥슨 NOW (직접 저장해서 올린 페이지, js/nexonnow.js) =====
+   - 공식 확률 페이지에 없는 해독기 → 해독기 목록에 추가 (카드·계산기·찜 그대로 사용)
+   - 강화·상자 등 → 표 화면
+   - 공식 페이지에도 있는 해독기 → 교차검증 + 실제 결과 표시 */
+const NOW_URL = 'https://now.nexon.com/service/csonline';
+const NOW = typeof NEXON_NOW !== 'undefined' && NEXON_NOW && NEXON_NOW.pages ? NEXON_NOW : null;
+const NOW_BY_TITLE = new Map();     /* 해독기 이름 → 넥슨 NOW 페이지 */
+const NOW_REAL = new Map();         /* '해독기|아이템' → 실제 결과(%) */
+const NOW_DEC = [];                 /* 넥슨 NOW에만 있는 해독기 id */
+const PAGES = [];                   /* 표로 보여줄 페이지 (강화·상자 등) */
+const PAGE_BY_ID = {};
+if (NOW) {
+  for (const k in NOW.images || {}) if (!IMAGES[k]) IMAGES[k] = NOW.images[k];
+  const info = new Map();
+  ITEMS.forEach(it => { if (!info.has(it.base)) info.set(it.base, it); });
+  NOW.pages.forEach(pg => {
+    NOW_BY_TITLE.set(pg.title, pg);
+    if (!pg.items) { PAGES.push(pg); PAGE_BY_ID[pg.id] = pg; return; }
+    pg.items.forEach(([n, , r]) => { if (r !== '') NOW_REAL.set(pg.title + '|' + norm(n), +r); });
+    if (pg.official || DEC.some(D => D.name === pg.title)) return;
+    const rows = []; let cur = null;
+    pg.items.forEach(([n, p]) => {
+      const base = baseName(n), k = info.get(base), im = IMAGES[base];
+      const grade = k ? k.grade : '기타';
+      const type = k ? k.type : im && /^classes\//.test(im[0]) ? 'class' : im && /^weapons\//.test(im[0]) ? 'weapon' : 'etc';
+      const per = periodOf(n) || '무제한';
+      if (cur && cur.p === p && cur.grade === grade && cur.type === type && cur.per === per) cur.names.push(n);
+      else rows.push(cur = { p, grade, type, per, names: [n] });
+    });
+    const D = { id: pg.id, name: pg.title, now: pg,
+      rows: rows.map(r => { LISTS.push(r.names.join('|')); return [`개당 ${(+r.p).toFixed(5)}% · ${r.per}`, r.p, LISTS.length - 1, r.grade, r.type]; }) };
+    DEC.push(D); DEC_BY_ID[D.id] = D; NOW_DEC.push(D.id); addItems(D);
+  });
+}
+const realOf = it => NOW_REAL.get(DEC_BY_ID[it.dec].name + '|' + norm(it.name));
+
+/* 공식 확률 페이지 ↔ 넥슨 NOW 교차검증 (같은 이름의 해독기끼리 아이템·확률 비교) */
+function crossCheck(D){
+  const pg = NOW_BY_TITLE.get(D.name);
+  if (!pg || !pg.items || D.now) return null;
+  const label = new Map(), cnt = (m, name, p) => {
+    const k = norm(name) + '@' + (+p).toFixed(5); label.set(k, `${name} ${(+p).toFixed(5)}%`); m.set(k, (m.get(k) || 0) + 1); };
+  const a = new Map(), b = new Map();
+  ITEMS.forEach(it => { if (it.dec === D.id) cnt(a, it.name, it.p); });
+  pg.items.forEach(([n, p]) => cnt(b, n, p));
+  let match = 0; const onlyNow = [], onlyOff = [];
+  for (const [k, c] of b) { const m = Math.min(c, a.get(k) || 0); match += m; for (let i = m; i < c; i++) onlyNow.push(label.get(k)); }
+  for (const [k, c] of a) { const m = Math.min(c, b.get(k) || 0); for (let i = m; i < c; i++) onlyOff.push(label.get(k)); }
+  return { pg, match, ok: !onlyNow.length && !onlyOff.length, onlyNow, onlyOff };
+}
+
+/* 자동 업데이트로 새 해독기가 생기면 이름으로 분류해 넣고, 사라진 해독기는 목록에서 뺌 */
+const NAV = (() => {
+  const nav = NAV_BASE.map(([c, ids]) => [c, ids.filter(id => DEC_BY_ID[id])]);
+  const known = new Set(NAV_BASE.flatMap(([, ids]) => ids));
+  for (const D of DEC) {
+    if (known.has(D.id) || D.now) continue;
+    const cat = /PC방/.test(D.name) ? 'PC방' : /클래스/.test(D.name) ? '클래스'
+      : /에픽|초월|유니크|레어|Top/.test(D.name) ? '무기' : '기타';
+    nav.find(([c]) => c === cat)[1].push(D.id);
+  }
+  nav.push(['넥슨 NOW 해독기', NOW_DEC]);
+  return nav.filter(([, ids]) => ids.length);
+})();
 const decItems = id => ITEMS.filter(it => it.dec === id);
 
 /* ===== 확률 변동 이력 ===== */
@@ -163,6 +217,7 @@ function changeText(c){
     case 'removed': return `<span class="hb gone">제외</span> ${esc(c.item)} <span class="hv">이전 ${pShort(+c.from)}</span>`;
     case 'up': case 'down':
       return `<span class="hb ${c.type}">${c.type === 'up' ? '▲' : '▼'}</span> ${esc(c.item)} <span class="hv">${pShort(+c.from)} → <b>${pShort(+c.to)}</b></span>`;
+    case 'page_update': return `<span class="hb up">갱신</span> 확률표가 새로 바뀌었어요 <span class="hv">${esc(c.from || '-')} → <b>${esc(c.to || '')}</b></span>`;
     case 'decoder_new': return '<span class="hb new">NEW</span> 해독기가 새로 추가됐어요';
     case 'decoder_removed': return '<span class="hb gone">삭제</span> 해독기가 목록에서 빠졌어요';
   }
@@ -199,25 +254,33 @@ document.addEventListener('error', e => {
 
 /* ===== 상태 ===== */
 const S = {
-  dec: DEFAULT_DEC, wish: false, q: '', all: false, type: 'all', period: 'all', grade: null,
+  dec: DEFAULT_DEC, wish: false, page: null, q: '', all: false, type: 'all', period: 'all', grade: null,
   sort: 'group', view: store.get('cso.view', 'card'), closed: new Set(),
 };
 function readHash(){
   S.wish = location.hash === '#wish';
-  if (S.wish) return;
+  const pm = location.hash.match(/now=(\d+)/);
+  S.page = pm && PAGE_BY_ID[+pm[1]] ? +pm[1] : null;
+  if (S.wish || S.page) return;
   const m = location.hash.match(/id=(\d+)/);
   const id = m && DEC_BY_ID[+m[1]] ? +m[1] : null;
   if (id) S.dec = id;
   else S.dec = +store.get('cso.dec', DEFAULT_DEC) in DEC_BY_ID ? +store.get('cso.dec', DEFAULT_DEC) : DEFAULT_DEC;
 }
+function goPage(id){
+  S.page = id; S.wish = false; S.q = ''; $('#q').value = ''; S.all = false; $('#allDec').checked = false;
+  history.replaceState(null, '', '#now=' + id);
+  renderAll();
+  window.scrollTo({ top: 0 });
+}
 function goWish(){
-  S.wish = true; S.q = ''; $('#q').value = ''; S.all = false; $('#allDec').checked = false;
+  S.page = null; S.wish = true; S.q = ''; $('#q').value = ''; S.all = false; $('#allDec').checked = false;
   history.replaceState(null, '', '#wish');
   renderAll();
   window.scrollTo({ top: 0 });
 }
 function go(id, keepSearch){
-  S.wish = false; S.dec = id; S.grade = null; S.closed.clear();
+  S.wish = false; S.page = null; S.dec = id; S.grade = null; S.closed.clear();
   if (!keepSearch) { S.all = false; $('#allDec').checked = false; }
   store.set('cso.dec', id);
   history.replaceState(null, '', '#id=' + id);
@@ -239,21 +302,54 @@ function renderNav(){
       <button class="nav-item" data-hist style="--c:#7d8597">
         <span class="star-i">${ICONS.clock}</span><span class="nm">확률 변경 기록</span><span class="ct">${HIST.length ? HIST[0].date.slice(5) : ''}</span></button>
     </div>`;
+  const pageCats = [];
+  if (PAGES.length) {
+    const order = (NOW.menu || []).map(([c]) => c);
+    PAGES.forEach(pg => { let c = pageCats.find(([n]) => n === pg.category); if (!c) pageCats.push(c = [pg.category, []]); c[1].push(pg); });
+    pageCats.sort((a, b) => (order.indexOf(a[0]) + 1 || 99) - (order.indexOf(b[0]) + 1 || 99));
+  }
+  const pagesHTML = pageCats.map(([cat, list]) => `<div class="nav-cat"><h3>${esc(cat)} <span class="now-tag">NOW</span></h3>
+      ${list.map(pg => `<button class="nav-item${S.page === pg.id ? ' on' : ''}" data-page="${pg.id}" style="--c:#7d8597">
+        <span class="dot"></span><span class="nm">${esc(pg.title)}</span></button>`).join('')}</div>`).join('');
   const html = mine + NAV.map(([cat, ids]) => `
     <div class="nav-cat"><h3>${cat}</h3>
       ${ids.map(id => { const D = DEC_BY_ID[id]; const n = decItems(id).length;
-        return `<button class="nav-item${id===S.dec && !S.wish && !(S.all && S.q)?' on':''}" data-id="${id}" style="--c:${decColor(D)}">
+        return `<button class="nav-item${id===S.dec && !S.wish && !S.page && !(S.all && S.q)?' on':''}" data-id="${id}" style="--c:${decColor(D)}">
           <span class="dot"></span><span class="nm">${esc(D.name)}</span><span class="ct">${n}</span></button>`; }).join('')}
-    </div>`).join('');
+    </div>`).join('') + pagesHTML;
   $('#sidebar').innerHTML = html;
   $('#decSelect').innerHTML = `<option value="wish"${S.wish ? ' selected' : ''}>★ 찜 목록 (${wishCount()})</option>` + NAV.map(([cat, ids]) =>
-    `<optgroup label="${cat}">${ids.map(id => `<option value="${id}"${id===S.dec && !S.wish?' selected':''}>${esc(DEC_BY_ID[id].name)} (${decItems(id).length})</option>`).join('')}</optgroup>`).join('');
+    `<optgroup label="${cat}">${ids.map(id => `<option value="${id}"${id===S.dec && !S.wish && !S.page?' selected':''}>${esc(DEC_BY_ID[id].name)} (${decItems(id).length})</option>`).join('')}</optgroup>`).join('')
+    + pageCats.map(([cat, list]) => `<optgroup label="${esc(cat)} (넥슨 NOW)">${list.map(pg =>
+      `<option value="now${pg.id}"${S.page === pg.id ? ' selected' : ''}>${esc(pg.title)}</option>`).join('')}</optgroup>`).join('');
 }
 
 /* ===== 해독기 소개 ===== */
+function nowMeta(pg){
+  return `<div class="now-meta">
+      <span>넥슨 NOW · ${esc(pg.version || '버전 정보 없음')}</span>
+      ${pg.period ? `<span>집계 ${esc(pg.period)}</span>` : ''}
+      <span>저장 ${esc(pg.saved)}</span>
+      <a href="${NOW_URL}" target="_blank" rel="noopener">넥슨 NOW ↗</a>
+    </div>`;
+}
+function checkLine(D){
+  const c = crossCheck(D); if (!c) return '';
+  return `<button class="check ${c.ok ? 'ok' : 'bad'}" data-check="${D.id}">${c.ok
+    ? `✓ 넥슨 NOW와 교차검증 일치 (${c.match}개)` : `⚠ 넥슨 NOW와 ${c.onlyNow.length + c.onlyOff.length}곳 다름 · 자세히`}</button>`;
+}
 function renderHero(){
   const hero = $('#hero');
-  $('#toolbar').hidden = S.wish && !(S.all && S.q);
+  $('#toolbar').hidden = (S.wish || S.page) && !(S.all && S.q);
+  if (S.page && !(S.all && S.q)) {
+    const pg = PAGE_BY_ID[S.page];
+    hero.style.setProperty('--c', '#7d8597');
+    hero.innerHTML = `
+      <div class="hero-top"><div><div class="kicker">${esc(pg.category)} · 넥슨 NOW에서 가져온 확률</div><h1>${esc(pg.title)}</h1></div></div>
+      ${nowMeta(pg)}
+      ${pg.notes.length ? `<ul class="now-notes">${pg.notes.filter(n => !/^※/.test(n)).map(n => `<li>${esc(n.replace(/^-\s*/, ''))}</li>`).join('')}</ul>` : ''}`;
+    return;
+  }
   if (S.wish && !(S.all && S.q)) {
     const keys = Object.keys(wish);
     const decs = new Set(ITEMS.filter(it => isWish(it.key)).map(it => it.dec));
@@ -290,8 +386,9 @@ function renderHero(){
   hero.innerHTML = `
     <div class="hero-top">
       <div>
-        <div class="kicker">${esc(NAV.find(([,ids]) => ids.includes(D.id))[0])} 해독기 · <a href="https://csonline.nexon.com/Probability/Index?id=${D.id}" target="_blank" rel="noopener">공식 확률표 ↗</a>${RECENT_DEC.has(D.id) ? ` · <button class="kick-hist" data-hist>최근 확률 변동 ${RECENT_DEC.get(D.id)}</button>` : ''}</div>
+        <div class="kicker">${esc(NAV.find(([,ids]) => ids.includes(D.id))[0])}${D.now ? '' : ` 해독기 · <a href="https://csonline.nexon.com/Probability/Index?id=${D.id}" target="_blank" rel="noopener">공식 확률표 ↗</a>`}${RECENT_DEC.has(D.id) ? ` · <button class="kick-hist" data-hist>최근 확률 변동 ${RECENT_DEC.get(D.id)}</button>` : ''}</div>
         <h1>${esc(D.name)}</h1>
+        ${checkLine(D)}
       </div>
       <div class="facts">
         <div class="fact"><div class="k">아이템</div><div class="v">${items.length}종</div></div>
@@ -299,6 +396,7 @@ function renderHero(){
         <div class="fact"><div class="k">${esc(top)} 등급 합계</div><div class="v" style="color:${GC[top]}">${pSum(byG[top])}</div></div>
       </div>
     </div>
+    ${D.now ? nowMeta(D.now) + '<p class="dist-hint">공식 확률 페이지에 없는 해독기라 자동 업데이트되지 않아요. 넥슨 NOW 화면을 다시 저장해서 올리면 갱신돼요.</p>' : ''}
     <div class="price-row">
       <label>해독 1회 비용 <input id="price" type="number" min="0" step="100" inputmode="numeric" placeholder="예: 3000" value="${priceOf(D.id) || ''}"> 원</label>
       <span class="dist-hint">해독기+해독키 1회 가격을 넣으면 아이템마다 평균 비용이 나와요. (이 브라우저에만 저장)</span>
@@ -368,6 +466,7 @@ function renderResults(){
   const global = S.all && qnorm(S.q);
   const box = $('#results');
   if (S.wish && !global) return renderWish(box);
+  if (S.page && !global) return renderPage(box);
 
   // 적용된 필터 표시
   const chips = [];
@@ -405,6 +504,40 @@ function renderResults(){
       <div class="gbody">${S.view === 'list' ? tableHTML(arr) : `<div class="grid">${arr.map(it => cardHTML(it)).join('')}</div>`}</div>
     </section>`;
   }).join('');
+}
+
+/* ===== 넥슨 NOW 표 화면 (강화·상자 등) ===== */
+function renderPage(box){
+  const pg = PAGE_BY_ID[S.page];
+  const q = qnorm(S.q);
+  let shown = 0;
+  const tables = pg.tables.map(t => {
+    const rows = q ? t.rows.filter(r => { const s = r.join(' '); return qnorm(s).includes(q) || chosung(qnorm(s)).includes(q); }) : t.rows;
+    shown += rows.length;
+    const isP = t.head.map(h => /확률|결과|%/.test(h));
+    const num = t.head.map((h, i) => t.rows.every(r => /^[\d.,%+\-~\s]*$/.test(r[i] || '')));
+    return `<table class="tbl ntbl"><thead><tr>${t.head.map((h, i) => `<th class="${num[i] ? 'num' : ''}">${esc(h)}</th>`).join('')}</tr></thead><tbody>
+      ${rows.map(r => `<tr>${r.map((c, i) => `<td class="${num[i] ? 'num' : ''}${isP[i] && /%/.test(c) ? ' p' : ''}">${esc(c)}</td>`).join('')}</tr>`).join('')}
+      </tbody></table>`;
+  });
+  $('#activeFilters').innerHTML = `<span>${shown.toLocaleString()}행${S.q ? ` · 검색: ${esc(S.q)}` : ''}</span>`;
+  box.innerHTML = `<div class="ntables" style="--c:var(--accent)">${tables.join('')}</div>`;
+}
+
+/* ===== 교차검증 결과 창 ===== */
+function openCheck(id){
+  const D = DEC_BY_ID[id], c = crossCheck(D);
+  const list = (t, arr) => arr.length ? `<h3>${t} (${arr.length})</h3><ul class="clist">${arr.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '';
+  hdlg.innerHTML = `<div class="h-head"><h2 id="hTitle">${esc(D.name)} 교차검증</h2>
+      <button class="d-close" data-close aria-label="닫기">${ICONS.close}</button></div>
+    <p class="h-desc">공식 확률 페이지(자동, ${UPDATED} 기준)와 넥슨 NOW 저장본(${esc(c.pg.saved)} 저장 · ${esc(c.pg.version)})을 아이템 이름과 확률로 비교했어요.
+      패치 직후에는 한쪽만 먼저 바뀌어서 잠깐 다를 수 있어요.</p>
+    <div class="h-body">
+      <p><b>${c.match}개 일치</b>${c.ok ? ' · 모두 같아요 ✓' : ''}</p>
+      ${list('넥슨 NOW에만 있음 (또는 확률이 다름)', c.onlyNow)}
+      ${list('공식 확률 페이지에만 있음 (또는 확률이 다름)', c.onlyOff)}
+    </div>`;
+  if (!hdlg.open) hdlg.showModal();
 }
 
 /* ===== 찜 목록 화면 ===== */
@@ -467,7 +600,7 @@ function openHist(){
     e.changes.forEach(c => { if (!byDec.has(c.dec)) byDec.set(c.dec, { name: c.decName, list: [] }); byDec.get(c.dec).list.push(c); });
     return `<section class="h-entry"><h3>${e.date} <small>${e.time || ''} 확인</small></h3>
       ${[...byDec].map(([dec, d]) => `<details class="h-dec"${d.list.length <= 12 ? ' open' : ''}>
-        <summary>${DEC_BY_ID[dec] ? `<button class="h-go" data-goto="${dec}">${esc(d.name)} ↗</button>` : `<b>${esc(d.name)}</b>`}
+        <summary>${DEC_BY_ID[dec] || PAGE_BY_ID[dec] ? `<button class="h-go" data-goto="${dec}">${esc(d.name)} ↗</button>` : `<b>${esc(d.name)}</b>`}
           <span class="muted">${d.list.length}건</span></summary>
         <ul>${d.list.map(c => `<li>${changeText(c)}</li>`).join('')}</ul></details>`).join('')}
     </section>`; }).join('')
@@ -482,14 +615,14 @@ function openHist(){
 hdlg.addEventListener('click', e => {
   if (e.target === hdlg || e.target.closest('[data-close]')) return hdlg.close();
   const g = e.target.closest('[data-goto]');
-  if (g) { e.preventDefault(); hdlg.close(); go(+g.dataset.goto); }
+  if (g) { e.preventDefault(); hdlg.close(); PAGE_BY_ID[+g.dataset.goto] ? goPage(+g.dataset.goto) : go(+g.dataset.goto); }
 });
 
 function syncControls(){
   for (const [sel, v] of [['#typeSeg', S.type], ['#periodSeg', S.period], ['#viewSeg', S.view]])
     document.querySelectorAll(sel + ' button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
   $('#sort').value = S.sort;
-  document.title = (S.all && S.q ? `“${S.q}” 검색` : S.wish ? '찜 목록' : DEC_BY_ID[S.dec].name) + ' 확률 | 카스온라인 해독기 확률 도감';
+  document.title = (S.all && S.q ? `“${S.q}” 검색` : S.wish ? '찜 목록' : S.page ? PAGE_BY_ID[S.page].title : DEC_BY_ID[S.dec].name) + ' 확률 | 카스온라인 해독기 확률 도감';
 }
 function renderAll(){ renderNav(); renderHero(); syncControls(); renderResults(); }
 
@@ -511,7 +644,7 @@ function openDetail(id){
       <div class="d-title"><span class="tag grade">${esc(it.grade)}</span>${it.period ? `<span class="tag period">${it.period}</span>` : ''}<h2 id="dTitle">${esc(it.name)}</h2>${starHTML(it, 'star big')}</div>
       <div class="d-sub">${esc(D.name)} · ${esc(it.group || '(이름 없음)')}</div>
       <div class="d-stats">
-        <div class="d-stat"><div class="k">획득 확률 (공식)</div><div class="v c">${pFull(it.p)}</div></div>
+        <div class="d-stat"><div class="k">획득 확률 (${D.now ? '넥슨 NOW' : '공식'})</div><div class="v c">${pFull(it.p)}${realOf(it) !== undefined ? `<small>실제 결과 ${realOf(it).toFixed(5)}%</small>` : ''}</div></div>
         <div class="d-stat"><div class="k">평균 기대 횟수${pr ? ' · 비용' : ''}</div><div class="v">${oneIn(it.p)}회${costLine(100 / it.p)}</div></div>
         <div class="d-stat"><div class="k">50% / 90% 확률로 얻으려면</div><div class="v">${triesFor(it.p,.5).toLocaleString()} / ${triesFor(it.p,.9).toLocaleString()}회${pr ? `<small>≈ ${won(pr * triesFor(it.p,.5))} / ${won(pr * triesFor(it.p,.9))}</small>` : ''}</div></div>
       </div>
@@ -579,9 +712,10 @@ dlg.addEventListener('click', e => {
 /* ===== 이벤트 ===== */
 $('#sidebar').addEventListener('click', e => {
   const b = e.target.closest('.nav-item'); if (!b) return;
-  if ('wishnav' in b.dataset) goWish(); else if ('hist' in b.dataset) openHist(); else go(+b.dataset.id);
+  if ('wishnav' in b.dataset) goWish(); else if ('hist' in b.dataset) openHist(); else if (b.dataset.page) goPage(+b.dataset.page); else go(+b.dataset.id);
 });
-$('#decSelect').addEventListener('change', e => e.target.value === 'wish' ? goWish() : go(+e.target.value));
+$('#decSelect').addEventListener('change', e => { const v = e.target.value;
+  v === 'wish' ? goWish() : v.startsWith('now') ? goPage(+v.slice(3)) : go(+v); });
 $('#histBtn').addEventListener('click', openHist);
 let qTimer;
 $('#q').addEventListener('input', e => { clearTimeout(qTimer); qTimer = setTimeout(() => { S.q = e.target.value.trim(); renderNav(); renderHero(); syncControls(); renderResults(); }, 120); });
@@ -598,6 +732,7 @@ $('#hero').addEventListener('input', e => {
 });
 $('#hero').addEventListener('click', e => {
   if (e.target.closest('[data-hist]')) return openHist();
+  const ck = e.target.closest('[data-check]'); if (ck) return openCheck(+ck.dataset.check);
   const wp = e.target.closest('[data-wp]'); if (wp) { S.period = wp.dataset.wp; renderHero(); renderResults(); return; }
   const lg = e.target.closest('.lg'); if (lg) { S.grade = S.grade === lg.dataset.g ? null : lg.dataset.g; renderHero(); renderResults(); return; }
   const j = e.target.closest('[data-gi]'); if (j) {
@@ -637,6 +772,7 @@ document.querySelector('.brand').addEventListener('click', e => { e.preventDefau
 /* ===== 시작 ===== */
 $('#updated').textContent = UPDATED;
 if (HIST.length && RECENT_DEC.size) $('#histBtn').classList.add('fresh');
+if (NOW) $('#nowInfo').textContent = `넥슨 NOW 확률(추가 해독기·강화·상자 등)은 직접 저장해 올린 파일 기준이며 자동 업데이트되지 않습니다. 마지막 반영 ${NOW.imported}.`;
 if (typeof LAST_CHANGES !== 'undefined' && LAST_CHANGES && (LAST_CHANGES.changed.length || LAST_CHANGES.removed.length)) {
   const parts = [];
   if (LAST_CHANGES.changed.length) parts.push('변경: ' + LAST_CHANGES.changed.join(', '));

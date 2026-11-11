@@ -10,6 +10,7 @@ GitHub Pages로 공개되고, 공식 확률 페이지가 바뀌면 자동으로 
 - **찜 목록**: 카드의 ☆를 누르면 사이드바 “찜 목록”에 모이고, 찜한 아이템을 어느 해독기에서 뽑는 게 유리한지 비교해 줍니다.
 - **초성·별명 검색**: `ㅋㅅㅌㅅ`(쿠스토스), `스컬7`(SKULL-7), `발록7`(BALROG-VII)처럼 검색할 수 있습니다. 별명은 `js/app.js` 위쪽 `ALIASES` / `NICKNAMES`에 추가합니다.
 - 찜 목록과 가격은 방문자 각자의 브라우저에만 저장됩니다(서버 없음).
+- **넥슨 NOW 확률**: 공식 확률 페이지에 없는 해독기·강화·개조·상자·파츠·각성 확률. 넥슨 NOW는 자동 수집을 허용하지 않아서, 직접 저장한 파일을 `nexon-now/` 폴더에 올리면 GitHub이 분석해 반영합니다(방법은 `nexon-now/README.md`). 공식 페이지와 겹치는 해독기는 교차검증 결과와 실제 결과를 함께 보여줍니다.
 
 ## 자동 업데이트
 
@@ -27,6 +28,9 @@ index.html               페이지
 css/style.css            디자인
 js/data.js               확률 데이터 (자동 수집) + 이미지 매핑
 js/history.js            확률 변동 이력 (자동 기록, 2026-11-11부터)
+js/nexonnow.js           넥슨 NOW 저장본 (nexon-now/ 폴더에 올리면 자동 생성)
+nexon-now/               넥슨 NOW 저장 파일 올리는 곳 (반영 후 자동 삭제)
+scripts/import_nexon_now.py  넥슨 NOW 저장 파일 → js/nexonnow.js
 js/app.js                화면 동작 (해독기 전환, 검색, 필터, 상세 팝업, 계산기, 찜, 변경 기록)
 images/weapons/          위키에서 받은 무기 이미지 (309개, WebP)
 images/classes/          위키에서 받은 캐릭터(클래스) 이미지 (74개, WebP)
