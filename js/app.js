@@ -54,7 +54,7 @@ const norm = s => s.toLowerCase()
   .replace(/Ⅰ/g,'i').replace(/Ⅱ/g,'ii').replace(/Ⅲ/g,'iii').replace(/Ⅳ/g,'iv').replace(/Ⅴ/g,'v')
   .replace(/[^a-z0-9가-힣]/g,'');
 const periodOf = n => (n.match(/\((\d+일)\)\s*$/)||[])[1] || '';
-const baseName = n => n.replace(/^\[ZHC\]\s*/,'').replace(/\s*\(\d+일\)\s*$/,'')
+const baseName = n => n.replace(/^\[ZHC\]\s*/,'').replace(/\s*\(\d+일\)\s*$/,'').replace(/\s+\d[\d,]*개$/,'')
   .replace(/\s*-\s*\d+강\s*$/,'').replace(/\([^()]*파츠[^()]*\)/,'').trim();
 const pShort = p => { let s = p.toFixed(5).replace(/0+$/,''); if (s.split('.')[1].length < 2) s = p.toFixed(2); return s + '%'; };
 const pFull  = p => p.toFixed(5) + '%';
@@ -136,24 +136,48 @@ if (NOW) {
   ITEMS.forEach(it => { if (!info.has(it.base)) info.set(it.base, it); });
   NOW.pages.forEach(pg => {
     NOW_BY_TITLE.set(pg.title, pg);
+    const box = boxEntries(pg);
+    if (box) { buildNowDecoder(pg, box, pg.category); return; }        /* 상자 → 해독기처럼 카드로 */
     if (!pg.items) { PAGES.push(pg); PAGE_BY_ID[pg.id] = pg; return; }
     if (pg.official || DEC.some(D => D.name === pg.title)) return;
+    buildNowDecoder(pg, pg.items, null);
+    NOW_DEC.push(pg.id);
+  });
+  function buildNowDecoder(pg, entries, sec){
     const rows = []; let cur = null;
     const gradeByP = {};      /* 같은 확률 묶음에서 아는 아이템의 등급 */
-    pg.items.forEach(([n, p]) => { const k = info.get(baseName(n)); if (k && !gradeByP[p]) gradeByP[p] = k.grade; });
-    pg.items.forEach(([n, p]) => {
+    entries.forEach(([n, p]) => { const k = info.get(baseName(n)); if (k && !gradeByP[p]) gradeByP[p] = k.grade; });
+    entries.forEach(([n, p]) => {
       const base = baseName(n), k = info.get(base), im = imageOf(base);
       const grade = k ? k.grade : gradeByP[p] || '기타';
-      const type = k ? k.type : im && /^classes\//.test(im[0]) ? 'class'
-        : /코스튬|마크|도색|스킨|상자|파츠|교환권|쿠폰|포인트|캡슐|조각|재료|스프레이|패키지|칭호|닉네임|캐릭터 카드/.test(n) ? 'etc' : 'weapon';
+      const type = k ? k.type : im && /^classes\//.test(im[0]) || (!im && gradeByP[p] === '클래스') ? 'class'
+        : /코스튬|마크|도색|스킨|상자|파츠|교환권|쿠폰|포인트|캡슐|조각|재료|부품|스프레이|패키지|칭호|닉네임|캐릭터 카드|코어|구슬|기어|코인|해독기|경험치|유리$/.test(n) ? 'etc' : 'weapon';
       const per = periodOf(n) || '무제한';
       if (cur && cur.p === p && cur.grade === grade && cur.type === type && cur.per === per) cur.names.push(n);
       else rows.push(cur = { p, grade, type, per, names: [n] });
     });
-    const D = { id: pg.id, name: pg.title, now: pg,
+    const D = { id: pg.id, name: pg.title, now: pg, sec,
       rows: rows.map(r => { LISTS.push(r.names.join('|')); return [`개당 ${(+r.p).toFixed(5)}% · ${r.per}`, r.p, LISTS.length - 1, r.grade, r.type]; }) };
-    DEC.push(D); DEC_BY_ID[D.id] = D; NOW_DEC.push(D.id); addItems(D);
-  });
+    DEC.push(D); DEC_BY_ID[D.id] = D; addItems(D);
+  }
+}
+/* 상자 표(상자 종류 · 아이템 · 설정 확률) → [[아이템 이름, 확률]]
+   이름 정리: '볼케이노 (무제한) 1개 9강' → '볼케이노 - 9강', '시프트 코어 (무제한) 3개' → '시프트 코어 3개', 'X (7일) 1개' → 'X (7일)' */
+function boxItemName(c){
+  const m = c.match(/^(.*?)\s*\(((?:무제한|\d+일)[^()]*)\)\s*(.*)$/);
+  if (!m) return c.trim();
+  const [, base, inner, tail] = m;
+  const per = inner.split('_')[0];
+  const enh = (inner.match(/(\d+)강/) || tail.match(/(\d+)강/) || [])[1];
+  const qty = (tail.match(/(\d[\d,]*)\s*개/) || [])[1];
+  return base.trim() + (enh ? ` - ${enh}강` : '') + (qty && qty !== '1' ? ` ${qty}개` : '') + (per !== '무제한' ? ` (${per})` : '');
+}
+function boxEntries(pg){
+  if (pg.category !== '상자' || !pg.tables || pg.tables.length !== 1) return null;
+  const t = pg.tables[0];
+  const ai = t.head.findIndex(h => /아이템|구성품/.test(h)), pi = t.head.findIndex(h => /설정 확률/.test(h));
+  if (ai < 0 || pi < 0 || !t.rows.length) return null;
+  return t.rows.map(r => [boxItemName(r[ai] || ''), (+String(r[pi]).replace(/[%,]/g, '') || 0).toFixed(5)]);
 }
 /* ===== 위쪽 탭 = 넥슨 NOW 메뉴 구조 (아직 안 올린 메뉴도 모두 보여줌) ===== */
 const DEFAULT_MENU = [
@@ -313,7 +337,7 @@ document.addEventListener('error', e => {
 
 /* ===== 상태 ===== */
 const S = {
-  dec: DEFAULT_DEC, sec: '해독기', pend: null, wish: false, page: null, q: '', all: false, type: 'all', period: 'all', grade: null,
+  dec: DEFAULT_DEC, sec: '해독기', decView: false, pend: null, wish: false, page: null, q: '', all: false, type: 'all', period: 'all', grade: null,
   sort: 'group', view: store.get('cso.view', 'card'), closed: new Set(),
 };
 function readHash(){
@@ -323,18 +347,20 @@ function readHash(){
   S.page = pm && PAGE_BY_ID[+pm[1]] ? +pm[1] : null;
   S.pend = qm ? qm[1] : null;
   S.sec = S.page ? PAGE_BY_ID[S.page].category : S.pend ? secOf(S.pend) : sm && SECTIONS.includes(sm[1]) ? sm[1] : '해독기';
-  if (S.wish || S.page || S.pend || S.sec !== '해독기') return;
+  S.decView = false;
   const m = location.hash.match(/id=(\d+)/);
   const id = m && DEC_BY_ID[+m[1]] ? +m[1] : null;
+  if (id && DEC_BY_ID[id].sec) { S.dec = id; S.sec = DEC_BY_ID[id].sec; S.decView = true; return; }   /* 상자 카드 화면 */
+  if (S.wish || S.page || S.pend || S.sec !== '해독기') return;
   if (id) S.dec = id;
   else S.dec = +store.get('cso.dec', DEFAULT_DEC) in DEC_BY_ID ? +store.get('cso.dec', DEFAULT_DEC) : DEFAULT_DEC;
 }
-function resetView(){ S.page = null; S.pend = null; S.wish = false; S.q = ''; $('#q').value = ''; S.all = false; $('#allDec').checked = false; }
+function resetView(){ S.page = null; S.pend = null; S.decView = false; S.wish = false; S.q = ''; $('#q').value = ''; S.all = false; $('#allDec').checked = false; }
 function show(hash){ history.replaceState(null, '', hash); renderAll(); window.scrollTo({ top: 0 }); }
 function goPage(id){ resetView(); S.page = id; S.sec = PAGE_BY_ID[id].category; show('#now=' + id); }
 function goPend(title){ resetView(); S.pend = title; S.sec = secOf(title); show('#pending=' + encodeURIComponent(title)); }
 function goSec(sec){
-  if (sec === '해독기') return go(S.dec);
+  if (sec === '해독기') { const last = +store.get('cso.dec', DEFAULT_DEC); return go(DEC_BY_ID[S.dec] && !DEC_BY_ID[S.dec].sec ? S.dec : DEC_BY_ID[last] ? last : DEFAULT_DEC); }
   resetView(); S.sec = sec; show('#sec=' + encodeURIComponent(sec));
 }
 function goEntry(e){ e.kind === 'page' ? goPage(e.id) : e.kind === 'pending' ? goPend(e.title) : go(e.id); }
@@ -345,9 +371,10 @@ function goWish(){
   window.scrollTo({ top: 0 });
 }
 function go(id, keepSearch){
-  S.wish = false; S.page = null; S.pend = null; S.sec = '해독기'; S.dec = id; S.grade = null; S.closed.clear();
+  S.wish = false; S.page = null; S.pend = null; S.dec = id; S.grade = null; S.closed.clear();
+  S.sec = DEC_BY_ID[id].sec || '해독기'; S.decView = !!DEC_BY_ID[id].sec;
   if (!keepSearch) { S.all = false; $('#allDec').checked = false; }
-  store.set('cso.dec', id);
+  if (!S.decView) store.set('cso.dec', id);
   history.replaceState(null, '', '#id=' + id);
   renderAll();
   window.scrollTo({ top: 0 });
@@ -359,7 +386,7 @@ function decColor(D){
   const g = D.rows.map(r => r[3]).sort((a,b) => GORDER[a] - GORDER[b])[0];
   return GC[g];
 }
-const isSpecial = () => S.wish || S.page || S.pend || S.sec !== '해독기';
+const isSpecial = () => S.wish || S.page || S.pend || (S.sec !== '해독기' && !S.decView);
 function renderTabs(){
   $('#secbar').innerHTML = `<div class="secbar-in">${SECTIONS.map(sec => {
     const total = sec === '해독기' ? 0 : (MENU.find(([c]) => c === sec) || ['', []])[1].length;
@@ -402,10 +429,10 @@ function renderNav(){
   } else {
     const list = (MENU.find(([c]) => c === S.sec) || ['', []])[1].map(entryOf);
     html = `<div class="nav-cat"><h3>${esc(S.sec)} <span class="now-tag">NOW</span></h3>
-      <button class="nav-item${!S.page && !S.pend ? ' on' : ''}" data-secall style="--c:var(--accent)"><span class="star-i">${SEC_ICON[S.sec] || ICONS.box}</span><span class="nm">한눈에 보기</span><span class="ct">${list.length}</span></button>
-      ${list.map(e => navItem(e, (e.kind === 'page' && S.page === e.id) || S.pend === e.title)).join('')}</div>`;
-    opts = `<option value="sec"${!S.page && !S.pend ? ' selected' : ''}>${esc(S.sec)} 한눈에 보기</option>` + list.map(e =>
-      `<option value="${e.kind === 'pending' ? 'pend:' + esc(e.title) : 'now' + e.id}"${(e.kind === 'page' && S.page === e.id) || S.pend === e.title ? ' selected' : ''}>${esc(e.title)}${e.kind === 'pending' ? ' (미반영)' : ''}</option>`).join('');
+      <button class="nav-item${!S.page && !S.pend && !S.decView ? ' on' : ''}" data-secall style="--c:var(--accent)"><span class="star-i">${SEC_ICON[S.sec] || ICONS.box}</span><span class="nm">한눈에 보기</span><span class="ct">${list.length}</span></button>
+      ${list.map(e => navItem(e, (e.kind === 'page' && S.page === e.id) || S.pend === e.title || (e.kind === 'dec' && S.decView && S.dec === e.id))).join('')}</div>`;
+    opts = `<option value="sec"${!S.page && !S.pend && !S.decView ? ' selected' : ''}>${esc(S.sec)} 한눈에 보기</option>` + list.map(e =>
+      `<option value="${e.kind === 'pending' ? 'pend:' + esc(e.title) : e.kind === 'page' ? 'now' + e.id : e.id}"${(e.kind === 'page' && S.page === e.id) || S.pend === e.title || (e.kind === 'dec' && S.decView && S.dec === e.id) ? ' selected' : ''}>${esc(e.title)}${e.kind === 'pending' ? ' (미반영)' : ''}</option>`).join('');
   }
   $('#sidebar').innerHTML = html;
   $('#decSelect').innerHTML = opts;
@@ -441,7 +468,7 @@ function renderHero(){
       </ol>`;
     return;
   }
-  if (S.sec !== '해독기' && !S.page) {
+  if (S.sec !== '해독기' && !S.page && !S.decView) {
     const list = (MENU.find(([c]) => c === S.sec) || ['', []])[1].map(entryOf);
     const done = list.filter(e => e.kind !== 'pending').length;
     hero.style.setProperty('--c', '#2fd3a4');
@@ -501,7 +528,7 @@ function renderHero(){
   hero.innerHTML = `
     <div class="hero-top">
       <div>
-        <div class="kicker">${esc(NAV.find(([,ids]) => ids.includes(D.id))[0])}${D.now ? '' : ` 해독기 · <a href="https://csonline.nexon.com/Probability/Index?id=${D.id}" target="_blank" rel="noopener">공식 확률표 ↗</a>`}${RECENT_DEC.has(D.id) ? ` · <button class="kick-hist" data-hist>최근 확률 변동 ${RECENT_DEC.get(D.id)}</button>` : ''}</div>
+        <div class="kicker">${esc((NAV.find(([,ids]) => ids.includes(D.id)) || [D.sec + ' · 넥슨 NOW'])[0])}${D.now ? '' : ` 해독기 · <a href="https://csonline.nexon.com/Probability/Index?id=${D.id}" target="_blank" rel="noopener">공식 확률표 ↗</a>`}${RECENT_DEC.has(D.id) ? ` · <button class="kick-hist" data-hist>최근 확률 변동 ${RECENT_DEC.get(D.id)}</button>` : ''}</div>
         <h1>${esc(D.name)}</h1>
         ${checkLine(D)}
       </div>
@@ -511,10 +538,11 @@ function renderHero(){
         <div class="fact"><div class="k">${esc(top)} 등급 합계</div><div class="v" style="color:${GC[top]}">${pSum(byG[top])}</div></div>
       </div>
     </div>
-    ${D.now ? nowMeta(D.now) + '<p class="dist-hint">공식 확률 페이지에 없는 해독기라 자동 업데이트되지 않아요. 넥슨 NOW 화면을 다시 저장해서 올리면 갱신돼요.</p>' : ''}
+    ${D.now ? nowMeta(D.now) + (D.sec ? (D.now.tables[0].desc || []).map(d => `<p class="dist-hint">${esc(d.replace(/^[※\-]\s*/, ''))}</p>`).join('') : '')
+      + `<p class="dist-hint">${D.sec ? '넥슨 NOW에서 가져온 확률' : '공식 확률 페이지에 없는 해독기'}라 자동 업데이트되지 않아요. 넥슨 NOW 화면을 다시 저장해서 올리면 갱신돼요.</p>` : ''}
     <div class="price-row">
-      <label>해독 1회 비용 <input id="price" type="number" min="0" step="100" inputmode="numeric" placeholder="예: 3000" value="${priceOf(D.id) || ''}"> 원</label>
-      <span class="dist-hint">해독기+해독키 1회 가격을 넣으면 아이템마다 평균 비용이 나와요. (이 브라우저에만 저장)</span>
+      <label>${D.sec ? '상자 1개 가격' : '해독 1회 비용'} <input id="price" type="number" min="0" step="100" inputmode="numeric" placeholder="예: 3000" value="${priceOf(D.id) || ''}"> 원</label>
+      <span class="dist-hint">${D.sec ? '상자 1개 가격을' : '해독기+해독키 1회 가격을'} 넣으면 아이템마다 평균 비용이 나와요. (이 브라우저에만 저장)</span>
     </div>
     <div class="dist">
       <div class="dist-bar">${gs.map(g => `<span style="--c:${GC[g]};width:${byG[g]/total*100}%;${S.grade && S.grade!==g?'opacity:.25':''}" title="${g} ${pSum(byG[g])}"></span>`).join('')}</div>
@@ -583,7 +611,7 @@ function renderResults(){
   if (S.wish && !global) return renderWish(box);
   if (S.page && !global) return renderPage(box);
   if (S.pend) { $('#activeFilters').innerHTML = ''; box.innerHTML = ''; return; }
-  if (S.sec !== '해독기') return renderSec(box);
+  if (S.sec !== '해독기' && !S.decView) return renderSec(box);
 
   // 적용된 필터 표시
   const chips = [];
@@ -668,8 +696,8 @@ function renderSec(box){
   $('#activeFilters').innerHTML = `<span>${list.length}개 메뉴</span>`;
   box.innerHTML = `<div class="secgrid">${list.map(e => {
     const pg = e.pg, nr = pg && pg.tables ? pg.tables.reduce((a, t) => a + t.rows.length, 0) : 0;
-    const rows = pg ? (pg.tables ? (nr ? nr + '행' : '설정 확률 없음') : pg.items.length + '종') : '';
-    const head = pg && pg.tables ? pg.tables[0].head.join(' · ') : '';
+    const rows = e.kind === 'dec' ? decItems(e.id).length + '종' : pg ? (pg.tables ? (nr ? nr + '행' : '설정 확률 없음') : pg.items.length + '종') : '';
+    const head = e.kind === 'dec' ? decItems(e.id).slice().sort((a, b) => b.p - a.p).slice(0, 3).map(i => i.name).join(' · ') : pg && pg.tables ? pg.tables[0].head.join(' · ') : '';
     return `<button class="stile${e.kind === 'pending' ? ' pending' : ''}" ${e.kind === 'pending' ? `data-pend="${esc(e.title)}"` : e.kind === 'page' ? `data-page="${e.id}"` : `data-id="${e.id}"`}>
       <span class="si">${SEC_ICON[S.sec] || ICONS.box}</span>
       <span class="st">${esc(e.title)}</span>
@@ -777,7 +805,7 @@ function syncControls(){
     document.querySelectorAll(sel + ' button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
   $('#sort').value = S.sort;
   $('.switch').hidden = S.sec !== '해독기';
-  $('#q').placeholder = S.sec === '해독기' ? '아이템 검색  (예: SKULL-7, 스컬7, ㅋㅅㅌㅅ)' : S.page ? '표 내용 검색' : '메뉴 이름 검색';
+  $('#q').placeholder = S.sec === '해독기' || S.decView ? '아이템 검색  (예: SKULL-7, 스컬7, ㅋㅅㅌㅅ)' : S.page ? '표 내용 검색' : '메뉴 이름 검색';
   document.title = (S.all && S.q ? `“${S.q}” 검색` : S.wish ? '찜 목록' : S.page ? PAGE_BY_ID[S.page].title : S.pend ? S.pend : S.sec !== '해독기' ? S.sec : DEC_BY_ID[S.dec].name) + ' 확률 | 카스온라인 해독기 확률 도감';
 }
 function renderAll(){ renderNav(); renderHero(); syncControls(); renderResults(); }
@@ -805,7 +833,7 @@ function openDetail(id){
         <div class="d-stat"><div class="k">50% / 90% 확률로 얻으려면</div><div class="v">${triesFor(it.p,.5).toLocaleString()} / ${triesFor(it.p,.9).toLocaleString()}회${pr ? `<small>≈ ${won(pr * triesFor(it.p,.5))} / ${won(pr * triesFor(it.p,.9))}</small>` : ''}</div></div>
       </div>
       <div class="d-calc">
-        <h3>해독 횟수 · 비용 계산기</h3>
+        <h3>${D.sec ? '개봉' : '해독'} 횟수 · 비용 계산기</h3>
         <div class="calc-row">
           <input type="number" id="calcN" min="1" max="1000000" value="${tries}" aria-label="해독 횟수"> 회
           ${[10, 50, 100, 500, 1000].map(n => `<button class="pre" data-n="${n}">${n}회</button>`).join('')}
