@@ -474,7 +474,7 @@ function openHist(){
     : `<div class="empty"><b>아직 기록된 변동이 없어요</b>${HSTART ? HSTART + '부터 ' : ''}공식 확률표가 바뀌면 자동으로 여기에 쌓여요.</div>`;
   hdlg.innerHTML = `<div class="h-head"><h2 id="hTitle">확률 변경 기록</h2>
       <button class="d-close" data-close aria-label="닫기">${ICONS.close}</button></div>
-    <p class="h-desc">하루 두 번(오전 9시·오후 7시) 공식 확률표를 확인해서 달라진 점만 기록해요. 카드에는 최근 ${BADGE_DAYS}일 안의 변동이 NEW / ▲ / ▼ 로 표시돼요.</p>
+    <p class="h-desc">20분마다 공식 확률표를 확인해서 달라진 점만 기록해요. 카드에는 최근 ${BADGE_DAYS}일 안의 변동이 NEW / ▲ / ▼ 로 표시돼요.</p>
     <div class="h-body">${body}</div>`;
   if (!hdlg.open) hdlg.showModal();
   hdlg.scrollTop = 0;
