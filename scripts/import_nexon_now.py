@@ -212,17 +212,32 @@ def write_now(data):
         f.write(js)
 
 
+def cleanup():
+    """올린 파일 정리: README.md 말고 전부 지움 (저장할 때 같이 생긴 _files 폴더 포함)"""
+    removed = 0
+    for name in os.listdir(IN_DIR):
+        p = os.path.join(IN_DIR, name)
+        if name.lower() == 'readme.md':
+            continue
+        shutil.rmtree(p) if os.path.isdir(p) else os.remove(p)
+        removed += 1
+    return removed
+
+
 def main():
-    files = sorted(glob.glob(os.path.join(IN_DIR, '*.htm*')) + glob.glob(os.path.join(IN_DIR, '*.mht*')))
+    # 폴더 바로 아래의 .html / .mhtml 만 읽음 (_files 폴더 안의 saved_resource.html 같은 건 무시)
+    files = sorted(f for f in glob.glob(os.path.join(IN_DIR, '*'))
+                   if os.path.isfile(f) and re.search(r'\.(html?|mhtml?)$', f, re.I))
     if not files:
-        log('nexon-now/ 폴더에 올린 파일 없음')
+        n = cleanup() if '--keep' not in sys.argv else 0
+        log(f'읽을 저장 파일 없음' + (f' — 남아 있던 {n}개 정리함 (_files 폴더는 올리지 않아도 됩니다)' if n else ''))
         return
     data = load_now()
     by_title = {p['title']: p for p in data['pages']}
     now = datetime.datetime.now(U.KST)
     official = U.load_old() or {'DECODERS': [], 'IMAGES': {}}
     official_names = {D['name'] for D in official['DECODERS']}
-    hist_entries, done = [], []
+    hist_entries, done, last = [], [], []
 
     for path in files:
         try:
@@ -245,6 +260,11 @@ def main():
         else:
             rec['tables'] = pg['tables']
         old = by_title.get(pg['title'])
+        same = bool(old and old.get('items') == rec.get('items') and old.get('tables') == rec.get('tables')
+                    and old.get('version') == rec['version'])
+        if same:
+            log(f"  (이미 반영된 것과 같은 내용: {rec['title']})")
+        last.append({'category': rec['category'], 'title': rec['title'], 'same': same})
         # 변동 이력 (이전에 올린 적이 있고 내용이 바뀐 경우)
         if old:
             if items and old.get('items') and not rec['official']:
@@ -274,6 +294,7 @@ def main():
     order = [t for _, ts in data['menu'] for t in ts]
     data['pages'] = sorted(by_title.values(), key=lambda p: order.index(p['title']) if p['title'] in order else 999)
     data['imported'] = now.strftime('%Y-%m-%d %H:%M')
+    data['last'] = last
 
     # 새 해독기 아이템 중 이미지가 없는 무기 → 위키에서 찾기
     known = dict(official.get('IMAGES') or {})
@@ -290,13 +311,8 @@ def main():
         h.insert(0, {'date': now.strftime('%Y-%m-%d'), 'time': now.strftime('%H:%M'), 'changes': hist_entries})
         U.write_history(h)
         log(f'변동 이력 {len(hist_entries)}건 기록')
-    # 올린 파일 정리 (저장할 때 같이 생긴 _files 폴더 포함)
     if '--keep' not in sys.argv:
-        for name in os.listdir(IN_DIR):
-            p = os.path.join(IN_DIR, name)
-            if name.lower() == 'readme.md':
-                continue
-            shutil.rmtree(p) if os.path.isdir(p) else os.remove(p)
+        cleanup()
     log(f'완료: {len(done)}개 페이지 반영 (전체 {len(data["pages"])}개)')
 
 

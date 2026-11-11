@@ -896,7 +896,8 @@ document.querySelector('.brand').addEventListener('click', e => { e.preventDefau
 /* ===== 시작 ===== */
 $('#updated').textContent = UPDATED;
 if (HIST.length && RECENT_DEC.size) $('#histBtn').classList.add('fresh');
-if (NOW) $('#nowInfo').textContent = `넥슨 NOW 확률(추가 해독기·강화·상자 등)은 직접 저장해 올린 파일 기준이며 자동 업데이트되지 않습니다. 마지막 반영 ${NOW.imported}.`;
+if (NOW) $('#nowInfo').textContent = `넥슨 NOW 확률(추가 해독기·강화·상자 등)은 직접 저장해 올린 파일 기준이며 자동 업데이트되지 않습니다. 마지막 반영 ${NOW.imported}`
+  + (NOW.last && NOW.last.length ? ` — ${NOW.last.map(l => `${l.category} > ${l.title}${l.same ? '(이전과 같은 내용)' : ''}`).join(', ')}` : '') + '.';
 if (typeof LAST_CHANGES !== 'undefined' && LAST_CHANGES && (LAST_CHANGES.changed.length || LAST_CHANGES.removed.length)) {
   const parts = [];
   if (LAST_CHANGES.changed.length) parts.push('변경: ' + LAST_CHANGES.changed.join(', '));
