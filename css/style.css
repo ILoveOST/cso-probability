@@ -325,6 +325,8 @@ dialog::backdrop{background:rgba(4,6,10,.72);backdrop-filter:blur(3px)}
 .ntbl td{white-space:normal}
 .ntbl .p{color:var(--accent)}
 .ntbl tbody tr{cursor:default}
+.cellimg{display:flex;align-items:center;gap:10px}
+.cellimg .mini{flex:0 0 auto}
 .clist{margin:0 0 12px;padding-left:18px;font-size:13px}
 .clist li{margin:3px 0}
 .h-body h3{font-size:13px;color:var(--sub);margin:14px 0 6px}

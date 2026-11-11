@@ -323,8 +323,17 @@ def main():
     # 새 해독기 아이템 중 이미지가 없는 무기 → 위키에서 찾기
     known = dict(official.get('IMAGES') or {})
     known.update(data.get('images') or {})
-    need = sorted({U.base_name(n) for p in data['pages'] if p.get('items') and not p['official']
-                   for n, _, _ in p['items']} - set(known))
+    need = {U.base_name(n) for p in data['pages'] if p.get('items') and not p['official']
+            for n, _, _ in p['items']}
+    # 상자·강화 등 표: '아이템·구성품·보상' 칸의 이름도 위키에서 찾아봄 (못 찾으면 그냥 글자로 표시)
+    for p in data['pages']:
+        for t in p.get('tables') or []:
+            cols = [i for i, h in enumerate(t['head']) if re.search(r'아이템|구성품|보상|획득|상품|결과', h)]
+            for r in t['rows']:
+                for i in cols:
+                    if i < len(r) and r[i] and not re.match(r'^[\d.,%+\-~\s]*$', r[i]):
+                        need.add(U.base_name(conv_name(r[i])))
+    need = sorted(need - set(known))
     if need and '--no-images' not in sys.argv:
         log(f'이미지 없는 아이템 {len(need)}개 위키에서 찾는 중')
         data.setdefault('images', {}).update(U.fetch_wiki_images(need))

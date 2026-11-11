@@ -608,6 +608,15 @@ function renderResults(){
 }
 
 /* ===== 넥슨 NOW 표 화면 (강화·상자 등) ===== */
+/* 표 칸의 이름이 아는 무기·캐릭터·아이템이면 작은 이미지를 붙임 */
+const BASE_INFO = new Map();
+ITEMS.forEach(it => { if (!BASE_INFO.has(it.base)) BASE_INFO.set(it.base, it); });
+function cellThumb(c){
+  const base = baseName(c.replace(/\s*\((?:무제한|\d+일)(?:_\d+강)?\)\s*$/, ''));
+  if (!base || !IMAGES[base]) return '';
+  const k = BASE_INFO.get(base);
+  return thumbHTML({ base, name: base, type: k ? k.type : /^classes\//.test(IMAGES[base][0]) ? 'class' : 'weapon', grade: k ? k.grade : '기타' }, 'mini');
+}
 function renderPage(box){
   const pg = PAGE_BY_ID[S.page];
   const q = qnorm(S.q);
@@ -618,7 +627,8 @@ function renderPage(box){
     const isP = t.head.map(h => /확률|결과|%/.test(h));
     const num = t.head.map((h, i) => t.rows.every(r => /^[\d.,%+\-~\s]*$/.test(r[i] || '')));
     return `<table class="tbl ntbl"><thead><tr>${t.head.map((h, i) => `<th class="${num[i] ? 'num' : ''}">${esc(h)}</th>`).join('')}</tr></thead><tbody>
-      ${rows.map(r => `<tr>${r.map((c, i) => `<td class="${num[i] ? 'num' : ''}${isP[i] && /%/.test(c) ? ' p' : ''}">${esc(c)}</td>`).join('')}</tr>`).join('')}
+      ${rows.map(r => `<tr>${r.map((c, i) => { const th = num[i] ? '' : cellThumb(c);
+        return `<td class="${num[i] ? 'num' : ''}${isP[i] && /%/.test(c) ? ' p' : ''}">${th ? `<div class="cellimg">${th}<span>${esc(c)}</span></div>` : esc(c)}</td>`; }).join('')}</tr>`).join('')}
       </tbody></table>`;
   });
   $('#activeFilters').innerHTML = `<span>${shown.toLocaleString()}행${S.q ? ` · 검색: ${esc(S.q)}` : ''}</span>`;
