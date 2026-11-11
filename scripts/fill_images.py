@@ -103,20 +103,15 @@ def wiki_index():
     log(f'위키 문서 {len(titles)}개 읽는 중')
     idx = {}
     for i in range(0, len(titles), 50):
-        r = U.wiki_api(action='query', prop='revisions', rvprop='content', rvslots='main', titles='|'.join(titles[i:i + 50]))
+        r = U.wiki_api(action='query', prop='revisions|pageimages', piprop='name', pilimit=50,
+                       rvprop='content', rvslots='main', titles='|'.join(titles[i:i + 50]))
         for pg in r.get('query', {}).get('pages', {}).values():
             t = (pg.get('revisions') or [{}])[0].get('slots', {}).get('main', {}).get('*', '')
             if not t:
                 continue
             head = t[:8000]
-            im = re.search(r'\|\s*image\d?\s*=\s*([^\n|]*)', head)
-            f = None
-            if im and im.group(1).strip():
-                f = re.sub(r'^(?:File|Image):', '', im.group(1).strip()).strip(' []')
+            f = page_image(pg, t)
             if not f:
-                g = re.search(r'\[\[(?:File|Image):([^|\]]+)', head)
-                f = g.group(1).strip() if g else None
-            if not f or not re.search(r'\.(png|jpe?g|gif|webp)$', f, re.I):
                 continue
             krs = re.findall(r'([^\n*|=\]\[]+?)\s*\(KR\)', head)
             krs += re.findall(r'\|\s*(?:kr|korean|krname|kor|name_?kr)\s*=\s*([^\n|]+)', head, re.I)
@@ -128,6 +123,14 @@ def wiki_index():
                         idx.setdefault(U.norm(part), (pg['title'], f, is_char))
         time.sleep(0.3)
     return idx
+
+
+def page_image(pg, text):
+    """문서 대표 이미지 파일명: 위키가 정한 대표 이미지(pageimage) → 없으면 infobox/본문의 첫 그림 파일 (동영상 제외)"""
+    if pg.get('pageimage'):
+        return pg['pageimage'].replace('_', ' ')
+    m = re.search(r'([^\n|\[\]=:<>]+\.(?:png|jpe?g|gif|webp))', text[:8000], re.I)
+    return m.group(1).strip() if m else None
 
 
 def download(title, f, kind):
@@ -177,6 +180,22 @@ def main():
             cands = [x['title'] for x in r.get('query', {}).get('search', [])]
         except Exception:  # noqa: BLE001
             cands = []
+        if cands:
+            r = U.wiki_api(action='query', prop='revisions|pageimages', piprop='name', rvprop='content',
+                           rvslots='main', titles=cands[0])
+            pg = next(iter(r.get('query', {}).get('pages', {}).values()), {})
+            t = (pg.get('revisions') or [{}])[0].get('slots', {}).get('main', {}).get('*', '')
+            if re.search(r'File:[^\]\n|]*\s' + re.escape(b) + r'\s+월페이퍼', t) and page_image(pg, t):
+                try:
+                    got = download(pg['title'], page_image(pg, t), 'class')
+                except Exception as e:  # noqa: BLE001
+                    got = None
+                    log(f'  받기 실패: {b} ({e})')
+                if got:
+                    extra[b] = got
+                    found += 1
+                    log(f'  찾음(캐릭터 월페이퍼 확인): {b} ← 위키 "{pg["title"]}"')
+                    continue
         log(f'  못 찾음: {b}' + (f'  (위키 검색 후보: {", ".join(cands)})' if cands else ''))
         if cands and '--why' in sys.argv:
             r = U.wiki_api(action='query', prop='revisions', rvprop='content', rvslots='main', titles='|'.join(cands))
@@ -190,7 +209,7 @@ def main():
         fp.write('/* 추가 이미지 연결 - scripts/fill_images.py 가 위키에서 한국 이름이 정확히 같은 문서를 찾아 만듭니다.\n'
                  '   직접 추가해도 됩니다: "아이템 기본 이름": ["images/ 아래 경로", "위키 경로(없으면 빈 칸)"] */\n'
                  'const IMAGES_EXTRA = ' + json.dumps(extra, ensure_ascii=False, indent=0) + ';\n')
-    log(f'완료: {found}개 새로 연결, {len(miss)}개는 위키에 한국 이름이 없어 못 찾음')
+    log(f'완료: {found}개 새로 연결, {len(need) - found}개는 위키에서 확실한 문서를 못 찾음')
 
 
 if __name__ == '__main__':
