@@ -1,7 +1,7 @@
 /* 넥슨 NOW 확률 - 직접 저장한 페이지를 nexon-now/ 폴더에 올리면 scripts/import_nexon_now.py 가 자동으로 만듭니다.
    출처: https://now.nexon.com/service/csonline (자동 업데이트 대상 아님 · 패치 때 다시 저장해서 올리면 갱신) */
 const NEXON_NOW = {
- "imported": "2026-11-12 00:10",
+ "imported": "2026-11-12 00:13",
  "menu": [
   [
    "해독기",
@@ -74,7 +74,7 @@ const NEXON_NOW = {
    "category": "해독기",
    "title": "에픽 해독기",
    "version": "2026년 09월 17일 업데이트",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [],
    "official": true,
    "items": [
@@ -229,7 +229,7 @@ const NEXON_NOW = {
    "category": "해독기",
    "title": "초월 해독기",
    "version": "2026년 10월 15일 업데이트",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [],
    "official": true,
    "items": [
@@ -772,7 +772,7 @@ const NEXON_NOW = {
    "category": "해독기",
    "title": "초월 프리미엄 해독기",
    "version": "2026년 10월 15일 업데이트",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [],
    "official": true,
    "items": [
@@ -963,7 +963,7 @@ const NEXON_NOW = {
    "category": "해독기",
    "title": "유니크 해독기",
    "version": "2026년 10월 15일 업데이트",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [],
    "official": true,
    "items": [
@@ -1974,7 +1974,7 @@ const NEXON_NOW = {
    "category": "해독기",
    "title": "유니크 프리미엄 해독기",
    "version": "2026년 10월 15일 업데이트",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [],
    "official": true,
    "items": [
@@ -2385,7 +2385,7 @@ const NEXON_NOW = {
    "category": "해독기",
    "title": "클래스 해독기",
    "version": "2026년 10월 15일 업데이트",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [],
    "official": true,
    "items": [
@@ -3020,7 +3020,7 @@ const NEXON_NOW = {
    "category": "해독기",
    "title": "클래스 프리미엄 해독기",
    "version": "2026년 10월 15일 업데이트",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [],
    "official": true,
    "items": [
@@ -3335,7 +3335,7 @@ const NEXON_NOW = {
    "category": "해독기",
    "title": "이벤트 해독기",
    "version": "2026년 10월 15일 업데이트",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [],
    "official": true,
    "items": [
@@ -5114,7 +5114,7 @@ const NEXON_NOW = {
    "category": "해독기",
    "title": "레어 해독기",
    "version": "",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [],
    "official": true,
    "items": [
@@ -6181,7 +6181,7 @@ const NEXON_NOW = {
    "category": "해독기",
    "title": "드라카르 해독기",
    "version": "2024년 06월 27일 업데이트",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [
     "- 2024년 06월 27일 점검 이후 ~ 2024년 7월 25일 점검 이전까지의 확률입니다."
    ],
@@ -6730,7 +6730,7 @@ const NEXON_NOW = {
    "category": "해독기",
    "title": "도색도안 해독기",
    "version": "2026년 01월 08일 업데이트",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [],
    "official": true,
    "items": [
@@ -6941,7 +6941,7 @@ const NEXON_NOW = {
    "category": "해독기",
    "title": "트레이스 해독기",
    "version": "",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [
     "- 2024년 08월 22일 점검 이후 ~ 2024년 10월 10일 점검 이전까지의 확률입니다."
    ],
@@ -7490,7 +7490,7 @@ const NEXON_NOW = {
    "category": "해독기",
    "title": "올인원 해독기",
    "version": "2026년 05월 28일 업데이트",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [
     "- 2026년 05월 28일 점검 이후 ~ 2026년 06월 25일 점검 이전까지의 확률입니다."
    ],
@@ -7815,7 +7815,7 @@ const NEXON_NOW = {
    "category": "해독기",
    "title": "[ZHC] 고급 암호 해독기",
    "version": "2025년 10월 16일 업데이트",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [],
    "official": true,
    "items": [
@@ -8466,7 +8466,7 @@ const NEXON_NOW = {
    "category": "해독기",
    "title": "눈꽃 해독기",
    "version": "",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [
     "- 2025년 12월 11일 점검 이후 ~ 2026년 01월 22일 점검 이전까지의 확률입니다."
    ],
@@ -8559,7 +8559,7 @@ const NEXON_NOW = {
    "category": "해독기",
    "title": "레전드 해독기",
    "version": "",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [
     "- 2026년 03월 05일 점검 이후 ~ 2026년 03월 19일 점검 이전까지의 확률입니다."
    ],
@@ -8744,7 +8744,7 @@ const NEXON_NOW = {
    "category": "해독기",
    "title": "올스타 해독기",
    "version": "",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [
     "- 2026년 03월 05일 점검 이후 ~ 2026년 04월 02일 점검 이전까지의 확률입니다."
    ],
@@ -9089,7 +9089,7 @@ const NEXON_NOW = {
    "category": "무기 강화",
    "title": "강화 성공 확률",
    "version": "",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [],
    "official": false,
    "tables": [
@@ -9114,7 +9114,7 @@ const NEXON_NOW = {
    "category": "무기 강화",
    "title": "강화 속성 확률",
    "version": "",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [],
    "official": false,
    "tables": [
@@ -9264,7 +9264,7 @@ const NEXON_NOW = {
    "category": "무기 강화",
    "title": "랜덤 -1 안티 강화 재료",
    "version": "",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [],
    "official": false,
    "tables": [
@@ -9394,7 +9394,7 @@ const NEXON_NOW = {
    "category": "무기 개조",
    "title": "개조 재료 경험치 획득량",
    "version": "",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [],
    "official": false,
    "tables": [
@@ -9612,7 +9612,7 @@ const NEXON_NOW = {
    "category": "무기 개조",
    "title": "레전드 등급 옵션",
    "version": "",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [],
    "official": false,
    "tables": [
@@ -9687,7 +9687,7 @@ const NEXON_NOW = {
    "category": "상자",
    "title": "에픽 해독기 조각 상자",
    "version": "2026년 07월 09일 업데이트",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [],
    "official": false,
    "tables": [
@@ -9815,7 +9815,7 @@ const NEXON_NOW = {
    "category": "상자",
    "title": "올인원 상자",
    "version": "",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [],
    "official": false,
    "tables": [
@@ -10313,7 +10313,7 @@ const NEXON_NOW = {
    "category": "상자",
    "title": "희망의 궤",
    "version": "2025년 12월 11일 업데이트",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [],
    "official": false,
    "tables": [
@@ -11091,7 +11091,7 @@ const NEXON_NOW = {
    "category": "상자",
    "title": "안티 강화재료 부품 확률 상자",
    "version": "2025년 06월 26일 업데이트",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [],
    "official": false,
    "tables": [
@@ -11142,7 +11142,7 @@ const NEXON_NOW = {
    "category": "상자",
    "title": "특수 작전 보급함",
    "version": "2026년 07월 23일 업데이트",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [],
    "official": false,
    "tables": [
@@ -11495,7 +11495,7 @@ const NEXON_NOW = {
    "category": "상자",
    "title": "각성 기어 상자",
    "version": "",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [],
    "official": false,
    "tables": [
@@ -11556,7 +11556,7 @@ const NEXON_NOW = {
    "category": "상자",
    "title": "데일리 찬스 상자",
    "version": "2026년 09월 03일 업데이트",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [],
    "official": false,
    "tables": [
@@ -11614,7 +11614,7 @@ const NEXON_NOW = {
    "category": "상자",
    "title": "시즌 데일리 찬스 상자",
    "version": "2026년 10월 15일 업데이트",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [],
    "official": false,
    "tables": [
@@ -11667,7 +11667,7 @@ const NEXON_NOW = {
    "category": "상자",
    "title": "개조 재료 랜덤 상자",
    "version": "",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [],
    "official": false,
    "tables": [
@@ -11703,7 +11703,7 @@ const NEXON_NOW = {
    "category": "상자",
    "title": "구슬 바구니",
    "version": "",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [],
    "official": false,
    "tables": [
@@ -11744,7 +11744,7 @@ const NEXON_NOW = {
    "category": "파츠 조합",
    "title": "파츠 조합 결과",
    "version": "",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [],
    "official": false,
    "tables": [
@@ -12259,7 +12259,7 @@ const NEXON_NOW = {
    "category": "클래스 각성",
    "title": "클래스 각성 능력치",
    "version": "",
-   "saved": "2026-11-12 00:10",
+   "saved": "2026-11-12 00:13",
    "notes": [],
    "official": false,
    "tables": [
@@ -12531,7 +12531,7 @@ const NEXON_NOW = {
   {
    "category": "해독기",
    "title": "드라카르 해독기",
-   "same": false
+   "same": true
   },
   {
    "category": "해독기",
@@ -12541,7 +12541,7 @@ const NEXON_NOW = {
   {
    "category": "해독기",
    "title": "트레이스 해독기",
-   "same": false
+   "same": true
   },
   {
    "category": "해독기",
