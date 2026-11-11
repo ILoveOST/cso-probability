@@ -236,10 +236,25 @@ def clean_note(n):
     return '' if re.fullmatch(r'[※\-\s]*', n) else n
 
 
+ACTUAL_HEAD = '실제 결과 (넥슨 NOW 기준)'
+
+
 def settings_only(page):
     """설정 확률만 남김: '실제 결과'·'횟수' 칸과 집계 관련 안내 문구 제거
-       설정 확률 칸이 없는 표(실제 결과만 공개하는 표)는 행을 비우고 actual_only 로 표시"""
+       단, 설정 확률 칸이 아예 없는 표(예: 강화 성공 확률)는 넥슨 NOW '실제 결과'를 확률로 사용 (actual 표시)"""
     for t in page.get('tables') or []:
+        if t.get('actual'):
+            continue
+        is_set = lambda h: bool(re.search(r'설정 확률|^확률$', h)) and '구간' not in h
+        real_i = next((i for i, h in enumerate(t['head']) if '실제' in h), -1)
+        if not any(is_set(h) for h in t['head']) and real_i >= 0:
+            keep = [i for i, h in enumerate(t['head']) if (i == real_i or '실제' not in h) and h.strip() != '횟수']
+            t['head'] = [ACTUAL_HEAD if i == real_i else t['head'][i] for i in keep]
+            t['rows'] = [[r[i] if i < len(r) else '' for i in keep] for r in t['rows']]
+            t['actual'] = True
+            t['period'], t['updated'] = page.get('period', ''), page.get('updated', '')
+            t['desc'] = [d for d in (clean_note(x) for x in t.get('desc', [])) if d]
+            continue
         keep = [i for i, h in enumerate(t['head']) if '실제' not in h and h.strip() != '횟수']
         if len(keep) != len(t['head']):
             t['head'] = [t['head'][i] for i in keep]
@@ -330,7 +345,7 @@ def main():
             data['menu'] = pg['menu']
         items = decoder_items(pg)
         rec = {'id': page_id(pg['title']), 'category': pg['category'], 'title': pg['title'],
-               'version': pg['version'],
+               'version': pg['version'], 'period': pg['period'], 'updated': pg['updated'],
                'saved': now.strftime('%Y-%m-%d %H:%M'), 'notes': pg['notes'],
                'official': pg['title'] in official_names}
         if items:
@@ -341,7 +356,7 @@ def main():
         old = by_title.get(pg['title'])
         if old:
             settings_only(old)
-        core = lambda p: [(t['head'], t['rows']) for t in p.get('tables') or []]
+        core = lambda p: [(t['head'], t['rows']) for t in p.get('tables') or [] if not t.get('actual')]   # 실제 결과 표는 매시간 바뀌므로 비교 제외
         same = bool(old and old.get('items') == rec.get('items') and core(old) == core(rec)
                     and old.get('version') == rec['version'])
         if same:

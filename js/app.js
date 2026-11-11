@@ -639,18 +639,19 @@ function renderPage(box){
   const q = qnorm(S.q);
   let shown = 0;
   const tables = pg.tables.map(t0 => {
-    const keep = t0.head.map((h, i) => /실제|^횟수$/.test(h) ? -1 : i).filter(i => i >= 0);   /* 실제 결과·횟수 칸은 표시 안 함 */
+    const keep = t0.head.map((h, i) => !t0.actual && /실제|^횟수$/.test(h) ? -1 : i).filter(i => i >= 0);   /* 실제 결과·횟수 칸은 표시 안 함 (설정 확률이 없는 표는 예외) */
     const t = { head: keep.map(i => t0.head[i]), rows: t0.rows.map(r => keep.map(i => r[i] ?? '')) };
     /* 표 설명: 첫 줄이 짧은 제목이면 소제목으로 */
     const desc = (t0.desc || []).slice();
     const title = desc.length && !/^[※\-]/.test(desc[0]) && desc[0].length <= 30 ? desc.shift() : '';
     const head = `${title ? `<h3 class="ttitle">${esc(title)}</h3>` : ''}${desc.length ? `<ul class="tdesc">${desc.map(d => `<li>${esc(d.replace(/^[※\-]\s*/, ''))}</li>`).join('')}</ul>` : ''}`;
+    const actualNote = t0.actual ? `<div class="note tnote actual">이 표는 넥슨 NOW에 <b>설정 확률이 따로 없어서</b> 넥슨 NOW <b>실제 결과</b> 확률을 보여줘요${t0.period ? ` (집계 ${esc(t0.period)}${t0.updated ? ` · ${esc(t0.updated)} 업데이트` : ''})` : ''}. 실제 결과는 넥슨 NOW에서 계속 갱신돼서, 다시 저장해 올리면 바뀔 수 있어요.</div>` : '';
     if (t0.actual_only) return `<section class="tblock">${head}<div class="note tnote">넥슨 NOW에서 이 표는 실제 결과(집계)만 공개하고 별도의 설정 확률 칸이 없어요. 이 사이트는 설정 확률만 보여줘서 표는 생략했어요.</div></section>`;
     const rows = q ? t.rows.filter(r => { const s = r.join(' '); return qnorm(s).includes(q) || chosung(qnorm(s)).includes(q); }) : t.rows;
     shown += rows.length;
-    const isP = t.head.map(h => /확률|%/.test(h));
+    const isP = t.head.map(h => /확률|%|실제 결과/.test(h) && !/구간/.test(h));
     const num = t.head.map((h, i) => t.rows.every(r => /^[\d.,%+\-~\s]*$/.test(r[i] || '')));
-    return `<section class="tblock">${head}<table class="tbl ntbl"><thead><tr>${t.head.map((h, i) => `<th class="${num[i] ? 'num' : ''}">${esc(h)}</th>`).join('')}</tr></thead><tbody>
+    return `<section class="tblock">${head}${actualNote}<table class="tbl ntbl"><thead><tr>${t.head.map((h, i) => `<th class="${num[i] ? 'num' : ''}">${esc(h)}</th>`).join('')}</tr></thead><tbody>
       ${rows.map(r => `<tr>${r.map((c, i) => { const th = num[i] ? '' : cellThumb(c);
         return `<td class="${num[i] ? 'num' : ''}${isP[i] && /%/.test(c) ? ' p' : ''}">${th ? `<div class="cellimg">${th}<span>${esc(c)}</span></div>` : esc(c)}</td>`; }).join('')}</tr>`).join('')}
       </tbody></table></section>`;
