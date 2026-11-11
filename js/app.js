@@ -157,7 +157,7 @@ if (NOW) {
       if (cur && cur.p === p && cur.grade === grade && cur.type === type && cur.per === per) cur.names.push(n);
       else rows.push(cur = { p, grade, type, per, names: [n] });
     });
-    const D = { id: pg.id, name: pg.title, now: pg, sec,
+    const D = { id: pg.id, name: pg.title, now: pg, sec, boxName: pg.tables && pg.tables[0].rows[0] ? pg.tables[0].rows[0][0] : '',
       rows: rows.map(r => { LISTS.push(r.names.join('|')); return [`개당 ${(+r.p).toFixed(5)}% · ${r.per}`, r.p, LISTS.length - 1, r.grade, r.type]; }) };
     DEC.push(D); DEC_BY_ID[D.id] = D; addItems(D);
   }
@@ -320,7 +320,7 @@ function imageOf(base){
 function imgTag(it){
   const im = imageOf(it.base);
   if (!im) return '';
-  return `<img src="${IMG_DIR}${im[0]}" data-fb="${WIKI_BASE}${im[1]}/revision/latest" alt="" loading="lazy" decoding="async">`;
+  return `<img src="${IMG_DIR}${im[0]}"${im[1] ? ` data-fb="${WIKI_BASE}${im[1]}/revision/latest"` : ''} alt="" loading="lazy" decoding="async">`;
 }
 function thumbHTML(it, cls='thumb'){
   if (it.type === 'class' && imageOf(it.base)) cls += ' portrait';
@@ -453,6 +453,12 @@ function checkLine(D){
   return `<button class="check ${c.ok ? 'ok' : 'bad'}" data-check="${D.id}">${c.ok
     ? `✓ 넥슨 NOW와 교차검증 일치 (${c.match}개)` : `⚠ 넥슨 NOW와 ${c.onlyNow.length + c.onlyOff.length}곳 다름 · 자세히`}</button>`;
 }
+/* 상자 그림: 상자 종류 이름(예: 시프트 코어 상자) 또는 메뉴 이름으로 */
+function boxPic(D){
+  if (!D || !D.sec) return '';
+  const im = imageOf(D.boxName) || imageOf(D.name);
+  return im ? `<img src="${IMG_DIR}${im[0]}" alt="">` : '';
+}
 function renderHero(){
   const hero = $('#hero');
   $('#toolbar').hidden = isSpecial() && !(S.all && S.q);
@@ -530,7 +536,7 @@ function renderHero(){
     <div class="hero-top">
       <div>
         <div class="kicker">${esc((NAV.find(([,ids]) => ids.includes(D.id)) || [D.sec + ' · 넥슨 NOW'])[0])}${D.now ? '' : ` 해독기 · <a href="https://csonline.nexon.com/Probability/Index?id=${D.id}" target="_blank" rel="noopener">공식 확률표 ↗</a>`}${RECENT_DEC.has(D.id) ? ` · <button class="kick-hist" data-hist>최근 확률 변동 ${RECENT_DEC.get(D.id)}</button>` : ''}</div>
-        <h1>${esc(D.name)}</h1>
+        <h1>${boxPic(D) ? `<span class="boxpic">${boxPic(D)}</span>` : ''}${esc(D.name)}</h1>
         ${checkLine(D)}
       </div>
       <div class="facts">
@@ -700,7 +706,7 @@ function renderSec(box){
     const rows = e.kind === 'dec' ? decItems(e.id).length + '종' : pg ? (pg.tables ? (nr ? nr + '행' : '설정 확률 없음') : pg.items.length + '종') : '';
     const head = e.kind === 'dec' ? decItems(e.id).slice().sort((a, b) => b.p - a.p).slice(0, 3).map(i => i.name).join(' · ') : pg && pg.tables ? pg.tables[0].head.join(' · ') : '';
     return `<button class="stile${e.kind === 'pending' ? ' pending' : ''}" ${e.kind === 'pending' ? `data-pend="${esc(e.title)}"` : e.kind === 'page' ? `data-page="${e.id}"` : `data-id="${e.id}"`}>
-      <span class="si">${SEC_ICON[S.sec] || ICONS.box}</span>
+      <span class="si${e.kind === 'dec' && boxPic(DEC_BY_ID[e.id]) ? ' pic' : ''}">${e.kind === 'dec' && boxPic(DEC_BY_ID[e.id]) || SEC_ICON[S.sec] || ICONS.box}</span>
       <span class="st">${esc(e.title)}</span>
       <span class="ss">${e.kind === 'pending' ? '아직 반영 안 됨' : `${esc((pg.version || '').replace(' 업데이트', ''))} · ${rows}`}</span>
       ${head ? `<span class="sh">${esc(head)}</span>` : ''}

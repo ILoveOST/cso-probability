@@ -155,6 +155,47 @@ def download(title, f, kind):
     return [f'{folder}/{local}', url.replace(U.WIKI_BASE, '')]
 
 
+# 위키 문서에 한국 이름이 안 적혀 있어서 직접 짝지은 것: 한국 이름 → (위키 문서 제목, 그림 설명에 들어간 말·없으면 대표 그림, 캐릭터 여부)
+MANUAL = {
+    '아케인 나베리우스': ('Arcane Naberius', None, False),
+    '어비스 리펄서': ('Abyss Repulsor', None, False),
+    'WA2000': ('Walther WA2000', None, False),
+    'WA2000 골드에디션': ('Walther WA2000', 'Gold', False),
+    'KSG12 골드에디션': ('Kel-Tec KSG-12', 'Gold', False),
+    '귀공녀 최지윤': ('Lady Choi Ji Yoon', None, True),
+    '길잡이 리트슈카': ('Pathfinder Ritsuka', None, True),
+    '밤의 마녀 루나': ('Night Witch Luna', None, True),
+    '피의 마녀 블러디': ('Blood Witch Bloody', None, True),
+    '블루래빗 미라주': ('Blue Rabbit Mirage', None, True),
+    '알파카 아네모네': ('Alpaca Anemone', None, True),
+    '여왕 이스마엘': ('Queen Ishmael', None, True),
+    '특수요원 메이': ('Special Agent Mei', None, True),
+    '폭탄광 유리': ('Pyromaniac Yuri', None, True),
+    '에이미': ('Amy', None, True),
+    '파블로': ('Pablo', None, True),
+}
+
+
+def manual_hit(b):
+    """MANUAL 표의 위키 문서에서 그림 파일 찾기 → (제목, 파일, 캐릭터) 또는 None"""
+    if b not in MANUAL:
+        return None
+    title, cap, is_char = MANUAL[b]
+    r = U.wiki_api(action='query', prop='revisions|pageimages', piprop='name', rvprop='content', rvslots='main',
+                   titles=title, redirects=1)
+    pg = next(iter(r.get('query', {}).get('pages', {}).values()), {})
+    t = (pg.get('revisions') or [{}])[0].get('slots', {}).get('main', {}).get('*', '')
+    if not t:
+        log(f'  위키 문서 없음: {b} → {title}')
+        return None
+    if cap:   # 변형(예: 골드)은 그림 설명에 그 말이 들어간 파일
+        m = re.search(r'(?:File:)?([^\n|\[\]=:<>]+\.(?:png|jpe?g|gif|webp))\|[^\]\n]*' + re.escape(cap), t, re.I)
+        f = m.group(1).strip() if m else None
+    else:
+        f = page_image(pg, t)
+    return (pg.get('title', title), f, is_char) if f else None
+
+
 def main():
     bases, images, now_images = all_bases()
     extra = load_js_obj(EXTRA_JS, 'IMAGES_EXTRA', {})
@@ -167,6 +208,11 @@ def main():
     found, miss = 0, []
     for b in need:
         hit = idx.get(U.norm(b))
+        if not hit:
+            try:
+                hit = manual_hit(b)
+            except Exception as e:  # noqa: BLE001
+                log(f'  직접 짝지은 문서 읽기 실패: {b} ({e})')
         if not hit:
             miss.append(b)
             continue

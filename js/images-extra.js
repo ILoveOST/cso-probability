@@ -92,5 +92,9 @@ const IMAGES_EXTRA = {
 "집사 파우스트": [
 "classes/buffclass23s3ct.webp",
 "9/95/Buffclass23s3ct.png"
+],
+"시프트 코어 상자": [
+"items/shift_core_box.webp",
+""
 ]
 };
