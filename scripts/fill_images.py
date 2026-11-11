@@ -127,9 +127,15 @@ def wiki_index():
 
 def page_image(pg, text):
     """문서 대표 이미지 파일명: 위키가 정한 대표 이미지(pageimage) → 없으면 infobox/본문의 첫 그림 파일 (동영상 제외)"""
+    pat = r'([^\n|\[\]=:<>]+\.(?:png|jpe?g|gif|webp))'
+    m = re.search(r'\|\s*image\d?\s*=(.{0,800})', text[:8000], re.S | re.I)     # 정보 상자 그림(무기만 나온 그림) 먼저
+    if m:
+        f = re.search(pat, m.group(1), re.I)
+        if f:
+            return re.sub(r'^\s*(?:File|Image)\s*:', '', f.group(1)).strip()
     if pg.get('pageimage'):
         return pg['pageimage'].replace('_', ' ')
-    m = re.search(r'([^\n|\[\]=:<>]+\.(?:png|jpe?g|gif|webp))', text[:8000], re.I)
+    m = re.search(pat, text[:8000], re.I)
     return m.group(1).strip() if m else None
 
 
