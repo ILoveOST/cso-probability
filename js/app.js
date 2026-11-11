@@ -104,6 +104,7 @@ const isWish = k => Object.prototype.hasOwnProperty.call(wish, k);
 const wishCount = () => Object.keys(wish).length;
 
 /* ===== 데이터 펼치기 ===== */
+if (typeof IMAGES_EXTRA !== 'undefined') for (const k in IMAGES_EXTRA) if (!IMAGES[k]) IMAGES[k] = IMAGES_EXTRA[k];   /* js/images-extra.js */
 const DEC = DECODERS;
 const DEC_BY_ID = Object.fromEntries(DEC.map(d => [d.id, d]));
 const DEFAULT_DEC = DEC_BY_ID[9616] ? 9616 : DEC[0].id;

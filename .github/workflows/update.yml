@@ -11,6 +11,11 @@ on:
   schedule:
     - cron: '7,27,47 * * * *'   # 20분마다
   workflow_dispatch:
+    inputs:
+      fill_images:
+        description: '이미지 없는 아이템을 위키에서 다시 찾기'
+        type: boolean
+        default: false
   push:
     branches: [main]
 
@@ -43,6 +48,12 @@ jobs:
         run: |
           pip install --quiet requests
           python scripts/update_data.py
+
+      - name: 이미지 다시 찾기 (수동 실행에서 선택했을 때만)
+        if: github.event_name == 'workflow_dispatch' && inputs.fill_images
+        run: |
+          pip install --quiet requests
+          python scripts/fill_images.py
 
       - name: 넥슨 NOW 저장 파일 반영
         id: nownx
