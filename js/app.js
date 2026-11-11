@@ -154,6 +154,48 @@ if (NOW) {
     DEC.push(D); DEC_BY_ID[D.id] = D; NOW_DEC.push(D.id); addItems(D);
   });
 }
+/* ===== 위쪽 탭 = 넥슨 NOW 메뉴 구조 (아직 안 올린 메뉴도 모두 보여줌) ===== */
+const DEFAULT_MENU = [
+  ['해독기', ['에픽 해독기','초월 해독기','초월 프리미엄 해독기','유니크 해독기','유니크 프리미엄 해독기','클래스 해독기','클래스 프리미엄 해독기','이벤트 해독기','레어 해독기','드라카르 해독기','도색도안 해독기','트레이스 해독기','올인원 해독기','[ZHC] 고급 암호 해독기','눈꽃 해독기','레전드 해독기','올스타 해독기']],
+  ['무기 강화', ['강화 성공 확률','강화 속성 확률','랜덤 -1 안티 강화 재료']],
+  ['무기 개조', ['개조 재료 경험치 획득량','레전드 등급 옵션']],
+  ['상자', ['에픽 해독기 조각 상자','올인원 상자','희망의 궤','안티 강화재료 부품 확률 상자','특수 작전 보급함','각성 기어 상자','데일리 찬스 상자','시즌 데일리 찬스 상자','개조 재료 랜덤 상자','구슬 바구니']],
+  ['파츠 조합', ['파츠 조합 결과']],
+  ['클래스 각성', ['클래스 각성 능력치']],
+];
+const MENU = (NOW && NOW.menu && NOW.menu.length ? NOW.menu : DEFAULT_MENU).map(([c, t]) => [c, [...t]]);
+/* 넥슨 NOW 메뉴에는 없지만 올린 페이지가 있으면 그 분류에 추가 */
+PAGES.forEach(pg => { let m = MENU.find(([c]) => c === pg.category); if (!m) MENU.push(m = [pg.category, []]); if (!m[1].includes(pg.title)) m[1].push(pg.title); });
+const SECTIONS = ['해독기', ...MENU.map(([c]) => c).filter(c => c !== '해독기')];
+const SEC_DESC = {
+  '해독기': '해독기를 열었을 때 나오는 아이템과 확률',
+  '무기 강화': '무기를 강화할 때 적용되는 성공·속성 확률',
+  '무기 개조': '무기를 개조할 때 적용되는 경험치·옵션 확률',
+  '상자': '상자를 열었을 때 나오는 구성품과 확률',
+  '파츠 조합': '파츠를 조합했을 때 나오는 결과 확률',
+  '클래스 각성': '클래스를 각성할 때 붙는 능력치 확률',
+};
+const SEC_ICON = {
+  '해독기': '<svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15" r="1.5"/></svg>',
+  '무기 강화': '<svg viewBox="0 0 24 24"><path d="M12 3v14M6 9l6-6 6 6"/><path d="M5 21h14"/></svg>',
+  '무기 개조': '<svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4Z"/></svg>',
+  '상자': ICONS.box,
+  '파츠 조합': '<svg viewBox="0 0 24 24"><path d="M10 3h4v3a2 2 0 1 0 4 0V3h3v7h-3a2 2 0 1 0 0 4h3v7h-7v-3a2 2 0 1 0-4 0v3H3v-7h3a2 2 0 1 0 0-4H3V3h7Z"/></svg>',
+  '클래스 각성': '<svg viewBox="0 0 24 24"><path d="m12 2 2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4Z"/></svg>',
+};
+const UPLOAD_URL = 'https://github.com/ILoveOST/cso-probability/upload/main/nexon-now';
+const secOf = title => (MENU.find(([, t]) => t.includes(title)) || ['해독기'])[0];
+/* 메뉴 항목 하나의 상태: 공식 해독기 / 넥슨 NOW 해독기 / 표 페이지 / 아직 안 올림 */
+function entryOf(title){
+  const D = DEC.find(d => d.name === title);
+  if (D && !D.now) return { kind: 'official', id: D.id, title };
+  if (D) return { kind: 'dec', id: D.id, title, pg: D.now };
+  const pg = PAGES.find(p => p.title === title);
+  if (pg) return { kind: 'page', id: pg.id, title, pg };
+  return { kind: 'pending', title };
+}
+const NOW_ONLY_DECS = () => (MENU.find(([c]) => c === '해독기') || ['', []])[1].map(entryOf).filter(e => e.kind !== 'official');
+
 const realOf = it => NOW_REAL.get(DEC_BY_ID[it.dec].name + '|' + norm(it.name));
 
 /* 공식 확률 페이지 ↔ 넥슨 NOW 교차검증 (같은 이름의 해독기끼리 아이템·확률 비교) */
@@ -254,33 +296,39 @@ document.addEventListener('error', e => {
 
 /* ===== 상태 ===== */
 const S = {
-  dec: DEFAULT_DEC, wish: false, page: null, q: '', all: false, type: 'all', period: 'all', grade: null,
+  dec: DEFAULT_DEC, sec: '해독기', pend: null, wish: false, page: null, q: '', all: false, type: 'all', period: 'all', grade: null,
   sort: 'group', view: store.get('cso.view', 'card'), closed: new Set(),
 };
 function readHash(){
-  S.wish = location.hash === '#wish';
-  const pm = location.hash.match(/now=(\d+)/);
+  const h = decodeURIComponent(location.hash);
+  S.wish = h === '#wish';
+  const pm = h.match(/now=(\d+)/), sm = h.match(/^#sec=(.+)$/), qm = h.match(/^#pending=(.+)$/);
   S.page = pm && PAGE_BY_ID[+pm[1]] ? +pm[1] : null;
-  if (S.wish || S.page) return;
+  S.pend = qm ? qm[1] : null;
+  S.sec = S.page ? PAGE_BY_ID[S.page].category : S.pend ? secOf(S.pend) : sm && SECTIONS.includes(sm[1]) ? sm[1] : '해독기';
+  if (S.wish || S.page || S.pend || S.sec !== '해독기') return;
   const m = location.hash.match(/id=(\d+)/);
   const id = m && DEC_BY_ID[+m[1]] ? +m[1] : null;
   if (id) S.dec = id;
   else S.dec = +store.get('cso.dec', DEFAULT_DEC) in DEC_BY_ID ? +store.get('cso.dec', DEFAULT_DEC) : DEFAULT_DEC;
 }
-function goPage(id){
-  S.page = id; S.wish = false; S.q = ''; $('#q').value = ''; S.all = false; $('#allDec').checked = false;
-  history.replaceState(null, '', '#now=' + id);
-  renderAll();
-  window.scrollTo({ top: 0 });
+function resetView(){ S.page = null; S.pend = null; S.wish = false; S.q = ''; $('#q').value = ''; S.all = false; $('#allDec').checked = false; }
+function show(hash){ history.replaceState(null, '', hash); renderAll(); window.scrollTo({ top: 0 }); }
+function goPage(id){ resetView(); S.page = id; S.sec = PAGE_BY_ID[id].category; show('#now=' + id); }
+function goPend(title){ resetView(); S.pend = title; S.sec = secOf(title); show('#pending=' + encodeURIComponent(title)); }
+function goSec(sec){
+  if (sec === '해독기') return go(S.dec);
+  resetView(); S.sec = sec; show('#sec=' + encodeURIComponent(sec));
 }
+function goEntry(e){ e.kind === 'page' ? goPage(e.id) : e.kind === 'pending' ? goPend(e.title) : go(e.id); }
 function goWish(){
-  S.page = null; S.wish = true; S.q = ''; $('#q').value = ''; S.all = false; $('#allDec').checked = false;
+  S.page = null; S.pend = null; S.sec = '해독기'; S.wish = true; S.q = ''; $('#q').value = ''; S.all = false; $('#allDec').checked = false;
   history.replaceState(null, '', '#wish');
   renderAll();
   window.scrollTo({ top: 0 });
 }
 function go(id, keepSearch){
-  S.wish = false; S.page = null; S.dec = id; S.grade = null; S.closed.clear();
+  S.wish = false; S.page = null; S.pend = null; S.sec = '해독기'; S.dec = id; S.grade = null; S.closed.clear();
   if (!keepSearch) { S.all = false; $('#allDec').checked = false; }
   store.set('cso.dec', id);
   history.replaceState(null, '', '#id=' + id);
@@ -294,34 +342,57 @@ function decColor(D){
   const g = D.rows.map(r => r[3]).sort((a,b) => GORDER[a] - GORDER[b])[0];
   return GC[g];
 }
+const isSpecial = () => S.wish || S.page || S.pend || S.sec !== '해독기';
+function renderTabs(){
+  $('#secbar').innerHTML = `<div class="secbar-in">${SECTIONS.map(sec => {
+    const total = sec === '해독기' ? 0 : (MENU.find(([c]) => c === sec) || ['', []])[1].length;
+    const done = sec === '해독기' ? 0 : (MENU.find(([c]) => c === sec) || ['', []])[1].filter(t => entryOf(t).kind !== 'pending').length;
+    return `<button class="sec${S.sec === sec ? ' on' : ''}" data-sec="${esc(sec)}">${SEC_ICON[sec] || ICONS.box}<span>${esc(sec)}</span>${total ? `<small>${done}/${total}</small>` : ''}</button>`;
+  }).join('')}</div>`;
+}
+function navItem(e, on){
+  const st = e.kind === 'pending' ? ' pending' : '';
+  const attr = e.kind === 'pending' ? `data-pend="${esc(e.title)}"` : e.kind === 'page' ? `data-page="${e.id}"` : `data-id="${e.id}"`;
+  const c = e.kind === 'dec' || e.kind === 'official' ? decColor(DEC_BY_ID[e.id]) : e.kind === 'page' ? '#2fd3a4' : '#4a5269';
+  const right = e.kind === 'pending' ? '<span class="ct">미반영</span>' : e.kind === 'dec' ? `<span class="ct">${decItems(e.id).length}</span>`
+    : e.kind === 'page' ? `<span class="ct">${e.pg.tables.reduce((a, t) => a + t.rows.length, 0)}행</span>` : '';
+  return `<button class="nav-item${on ? ' on' : ''}${st}" ${attr} style="--c:${c}"><span class="dot"></span><span class="nm">${esc(e.title)}</span>${right}</button>`;
+}
 function renderNav(){
-  const wishOn = S.wish && !(S.all && S.q);
-  const mine = `<div class="nav-cat"><h3>내 목록</h3>
+  renderTabs();
+  const searching = S.all && S.q;
+  let html = '', opts = '';
+  if (S.sec === '해독기') {
+    const wishOn = S.wish && !searching;
+    html = `<div class="nav-cat"><h3>내 목록</h3>
       <button class="nav-item wish-nav${wishOn ? ' on' : ''}" data-wishnav style="--c:var(--accent)">
         <span class="star-i">${ICONS.star}</span><span class="nm">찜 목록</span><span class="ct">${wishCount()}</span></button>
       <button class="nav-item" data-hist style="--c:#7d8597">
         <span class="star-i">${ICONS.clock}</span><span class="nm">확률 변경 기록</span><span class="ct">${HIST.length ? HIST[0].date.slice(5) : ''}</span></button>
     </div>`;
-  const pageCats = [];
-  if (PAGES.length) {
-    const order = (NOW.menu || []).map(([c]) => c);
-    PAGES.forEach(pg => { let c = pageCats.find(([n]) => n === pg.category); if (!c) pageCats.push(c = [pg.category, []]); c[1].push(pg); });
-    pageCats.sort((a, b) => (order.indexOf(a[0]) + 1 || 99) - (order.indexOf(b[0]) + 1 || 99));
+    const cats = NAV.filter(([c]) => c !== '넥슨 NOW 해독기');
+    html += cats.map(([cat, ids]) => `<div class="nav-cat"><h3>${cat}</h3>
+      ${ids.map(id => { const D = DEC_BY_ID[id], ck = crossCheck(D);
+        return `<button class="nav-item${id === S.dec && !isSpecial() && !searching ? ' on' : ''}" data-id="${id}" style="--c:${decColor(D)}">
+          <span class="dot"></span><span class="nm">${esc(D.name)}</span>${ck ? `<span class="ck ${ck.ok ? 'ok' : 'bad'}" title="넥슨 NOW 교차검증 ${ck.ok ? '일치' : '다름'}">${ck.ok ? '✓' : '!'}</span>` : ''}<span class="ct">${decItems(id).length}</span></button>`; }).join('')}
+      </div>`).join('');
+    const extra = NOW_ONLY_DECS();
+    if (extra.length) html += `<div class="nav-cat"><h3>넥슨 NOW 해독기 <span class="now-tag">NOW</span></h3>
+      ${extra.map(e => navItem(e, (e.kind === 'dec' && e.id === S.dec && !isSpecial() && !searching) || S.pend === e.title)).join('')}</div>`;
+    opts = `<option value="wish"${S.wish ? ' selected' : ''}>★ 찜 목록 (${wishCount()})</option>` + cats.map(([cat, ids]) =>
+      `<optgroup label="${cat}">${ids.map(id => `<option value="${id}"${id === S.dec && !isSpecial() ? ' selected' : ''}>${esc(DEC_BY_ID[id].name)} (${decItems(id).length})</option>`).join('')}</optgroup>`).join('')
+      + (extra.length ? `<optgroup label="넥슨 NOW 해독기">${extra.map(e => `<option value="${e.kind === 'pending' ? 'pend:' + esc(e.title) : e.id}"${(e.kind === 'dec' && e.id === S.dec && !isSpecial()) || S.pend === e.title ? ' selected' : ''}>${esc(e.title)}${e.kind === 'pending' ? ' (미반영)' : ''}</option>`).join('')}</optgroup>` : '');
+  } else {
+    const list = (MENU.find(([c]) => c === S.sec) || ['', []])[1].map(entryOf);
+    html = `<div class="nav-cat"><h3>${esc(S.sec)} <span class="now-tag">NOW</span></h3>
+      <button class="nav-item${!S.page && !S.pend ? ' on' : ''}" data-secall style="--c:var(--accent)"><span class="star-i">${SEC_ICON[S.sec] || ICONS.box}</span><span class="nm">한눈에 보기</span><span class="ct">${list.length}</span></button>
+      ${list.map(e => navItem(e, (e.kind === 'page' && S.page === e.id) || S.pend === e.title)).join('')}</div>`;
+    opts = `<option value="sec"${!S.page && !S.pend ? ' selected' : ''}>${esc(S.sec)} 한눈에 보기</option>` + list.map(e =>
+      `<option value="${e.kind === 'pending' ? 'pend:' + esc(e.title) : 'now' + e.id}"${(e.kind === 'page' && S.page === e.id) || S.pend === e.title ? ' selected' : ''}>${esc(e.title)}${e.kind === 'pending' ? ' (미반영)' : ''}</option>`).join('');
   }
-  const pagesHTML = pageCats.map(([cat, list]) => `<div class="nav-cat"><h3>${esc(cat)} <span class="now-tag">NOW</span></h3>
-      ${list.map(pg => `<button class="nav-item${S.page === pg.id ? ' on' : ''}" data-page="${pg.id}" style="--c:#7d8597">
-        <span class="dot"></span><span class="nm">${esc(pg.title)}</span></button>`).join('')}</div>`).join('');
-  const html = mine + NAV.map(([cat, ids]) => `
-    <div class="nav-cat"><h3>${cat}</h3>
-      ${ids.map(id => { const D = DEC_BY_ID[id]; const n = decItems(id).length;
-        return `<button class="nav-item${id===S.dec && !S.wish && !S.page && !(S.all && S.q)?' on':''}" data-id="${id}" style="--c:${decColor(D)}">
-          <span class="dot"></span><span class="nm">${esc(D.name)}</span><span class="ct">${n}</span></button>`; }).join('')}
-    </div>`).join('') + pagesHTML;
   $('#sidebar').innerHTML = html;
-  $('#decSelect').innerHTML = `<option value="wish"${S.wish ? ' selected' : ''}>★ 찜 목록 (${wishCount()})</option>` + NAV.map(([cat, ids]) =>
-    `<optgroup label="${cat}">${ids.map(id => `<option value="${id}"${id===S.dec && !S.wish && !S.page?' selected':''}>${esc(DEC_BY_ID[id].name)} (${decItems(id).length})</option>`).join('')}</optgroup>`).join('')
-    + pageCats.map(([cat, list]) => `<optgroup label="${esc(cat)} (넥슨 NOW)">${list.map(pg =>
-      `<option value="now${pg.id}"${S.page === pg.id ? ' selected' : ''}>${esc(pg.title)}</option>`).join('')}</optgroup>`).join('');
+  $('#decSelect').innerHTML = opts;
+  $('.mobile-picker label').textContent = S.sec === '해독기' ? '해독기' : S.sec;
 }
 
 /* ===== 해독기 소개 ===== */
@@ -340,7 +411,35 @@ function checkLine(D){
 }
 function renderHero(){
   const hero = $('#hero');
-  $('#toolbar').hidden = (S.wish || S.page) && !(S.all && S.q);
+  $('#toolbar').hidden = isSpecial() && !(S.all && S.q);
+  if (S.pend) {
+    hero.style.setProperty('--c', '#4a5269');
+    hero.innerHTML = `
+      <div class="hero-top"><div><div class="kicker">${esc(S.sec)} · 넥슨 NOW</div><h1>${esc(S.pend)}</h1>
+        <span class="check bad">아직 반영 안 됨</span></div></div>
+      <p class="pend-desc">넥슨 NOW에는 있지만 아직 이 사이트에 올라오지 않은 메뉴예요.</p>
+      <ol class="pend-steps">
+        <li><a href="${NOW_URL}" target="_blank" rel="noopener">넥슨 NOW ↗</a>에서 <b>${esc(S.pend)}</b> 메뉴를 열고 <kbd>Ctrl</kbd>+<kbd>S</kbd>로 저장</li>
+        <li><a href="${UPLOAD_URL}" target="_blank" rel="noopener">GitHub nexon-now 폴더에 올리기 ↗</a> (저장소 관리자만 가능)</li>
+        <li>1~2분 뒤 자동으로 반영돼요</li>
+      </ol>`;
+    return;
+  }
+  if (S.sec !== '해독기' && !S.page) {
+    const list = (MENU.find(([c]) => c === S.sec) || ['', []])[1].map(entryOf);
+    const done = list.filter(e => e.kind !== 'pending').length;
+    hero.style.setProperty('--c', '#2fd3a4');
+    hero.innerHTML = `
+      <div class="hero-top">
+        <div><div class="kicker">넥슨 NOW에서 가져온 확률</div><h1>${esc(S.sec)}</h1></div>
+        <div class="facts">
+          <div class="fact"><div class="k">메뉴</div><div class="v">${list.length}개</div></div>
+          <div class="fact"><div class="k">반영됨</div><div class="v">${done}개</div></div>
+        </div>
+      </div>
+      <p class="pend-desc">${esc(SEC_DESC[S.sec] || '')}을 메뉴별로 정리했어요. 넥슨 NOW 화면을 저장해서 올리면 반영돼요 (자동 업데이트 대상 아님).</p>`;
+    return;
+  }
   if (S.page && !(S.all && S.q)) {
     const pg = PAGE_BY_ID[S.page];
     hero.style.setProperty('--c', '#7d8597');
@@ -467,6 +566,8 @@ function renderResults(){
   const box = $('#results');
   if (S.wish && !global) return renderWish(box);
   if (S.page && !global) return renderPage(box);
+  if (S.pend) { $('#activeFilters').innerHTML = ''; box.innerHTML = ''; return; }
+  if (S.sec !== '해독기') return renderSec(box);
 
   // 적용된 필터 표시
   const chips = [];
@@ -522,6 +623,23 @@ function renderPage(box){
   });
   $('#activeFilters').innerHTML = `<span>${shown.toLocaleString()}행${S.q ? ` · 검색: ${esc(S.q)}` : ''}</span>`;
   box.innerHTML = `<div class="ntables" style="--c:var(--accent)">${tables.join('')}</div>`;
+}
+
+/* ===== 섹션 한눈에 보기 (강화·개조·상자 등) ===== */
+function renderSec(box){
+  const q = qnorm(S.q);
+  const list = (MENU.find(([c]) => c === S.sec) || ['', []])[1].map(entryOf)
+    .filter(e => !q || qnorm(e.title).includes(q) || chosung(qnorm(e.title)).includes(q));
+  $('#activeFilters').innerHTML = `<span>${list.length}개 메뉴</span>`;
+  box.innerHTML = `<div class="secgrid">${list.map(e => {
+    const pg = e.pg, rows = pg ? (pg.tables ? pg.tables.reduce((a, t) => a + t.rows.length, 0) + '행' : pg.items.length + '종') : '';
+    const head = pg && pg.tables ? pg.tables[0].head.join(' · ') : '';
+    return `<button class="stile${e.kind === 'pending' ? ' pending' : ''}" ${e.kind === 'pending' ? `data-pend="${esc(e.title)}"` : e.kind === 'page' ? `data-page="${e.id}"` : `data-id="${e.id}"`}>
+      <span class="si">${SEC_ICON[S.sec] || ICONS.box}</span>
+      <span class="st">${esc(e.title)}</span>
+      <span class="ss">${e.kind === 'pending' ? '아직 반영 안 됨' : `${esc((pg.version || '').replace(' 업데이트', ''))} · ${rows}`}</span>
+      ${head ? `<span class="sh">${esc(head)}</span>` : ''}
+    </button>`; }).join('')}</div>`;
 }
 
 /* ===== 교차검증 결과 창 ===== */
@@ -622,7 +740,9 @@ function syncControls(){
   for (const [sel, v] of [['#typeSeg', S.type], ['#periodSeg', S.period], ['#viewSeg', S.view]])
     document.querySelectorAll(sel + ' button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
   $('#sort').value = S.sort;
-  document.title = (S.all && S.q ? `“${S.q}” 검색` : S.wish ? '찜 목록' : S.page ? PAGE_BY_ID[S.page].title : DEC_BY_ID[S.dec].name) + ' 확률 | 카스온라인 해독기 확률 도감';
+  $('.switch').hidden = S.sec !== '해독기';
+  $('#q').placeholder = S.sec === '해독기' ? '아이템 검색  (예: SKULL-7, 스컬7, ㅋㅅㅌㅅ)' : S.page ? '표 내용 검색' : '메뉴 이름 검색';
+  document.title = (S.all && S.q ? `“${S.q}” 검색` : S.wish ? '찜 목록' : S.page ? PAGE_BY_ID[S.page].title : S.pend ? S.pend : S.sec !== '해독기' ? S.sec : DEC_BY_ID[S.dec].name) + ' 확률 | 카스온라인 해독기 확률 도감';
 }
 function renderAll(){ renderNav(); renderHero(); syncControls(); renderResults(); }
 
@@ -712,10 +832,12 @@ dlg.addEventListener('click', e => {
 /* ===== 이벤트 ===== */
 $('#sidebar').addEventListener('click', e => {
   const b = e.target.closest('.nav-item'); if (!b) return;
-  if ('wishnav' in b.dataset) goWish(); else if ('hist' in b.dataset) openHist(); else if (b.dataset.page) goPage(+b.dataset.page); else go(+b.dataset.id);
+  if ('wishnav' in b.dataset) goWish(); else if ('hist' in b.dataset) openHist(); else if ('secall' in b.dataset) goSec(S.sec);
+  else if (b.dataset.pend) goPend(b.dataset.pend); else if (b.dataset.page) goPage(+b.dataset.page); else go(+b.dataset.id);
 });
 $('#decSelect').addEventListener('change', e => { const v = e.target.value;
-  v === 'wish' ? goWish() : v.startsWith('now') ? goPage(+v.slice(3)) : go(+v); });
+  v === 'wish' ? goWish() : v === 'sec' ? goSec(S.sec) : v.startsWith('pend:') ? goPend(v.slice(5)) : v.startsWith('now') ? goPage(+v.slice(3)) : go(+v); });
+$('#secbar').addEventListener('click', e => { const b = e.target.closest('[data-sec]'); if (b) goSec(b.dataset.sec); });
 $('#histBtn').addEventListener('click', openHist);
 let qTimer;
 $('#q').addEventListener('input', e => { clearTimeout(qTimer); qTimer = setTimeout(() => { S.q = e.target.value.trim(); renderNav(); renderHero(); syncControls(); renderResults(); }, 120); });
@@ -752,6 +874,8 @@ $('#activeFilters').addEventListener('click', e => {
   renderAll();
 });
 $('#results').addEventListener('click', e => {
+  const st = e.target.closest('.stile');
+  if (st) return st.dataset.pend ? goPend(st.dataset.pend) : st.dataset.page ? goPage(+st.dataset.page) : go(+st.dataset.id);
   const w = e.target.closest('[data-wish]');
   if (w) { e.preventDefault(); e.stopPropagation(); return toggleWish(w.dataset.wish, w.dataset.wname); }
   const g = e.target.closest('tr[data-goto]'); if (g) return go(+g.dataset.goto);
