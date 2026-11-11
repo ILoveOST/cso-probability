@@ -96,5 +96,69 @@ const IMAGES_EXTRA = {
 "시프트 코어 상자": [
 "items/shift_core_box.webp",
 ""
+],
+"KSG12 골드에디션": [
+"weapons/ksg12g_gfx.webp",
+"b/b6/Ksg12g_gfx.png"
+],
+"WA2000": [
+"weapons/wa2000.webp",
+"6/60/Wa2000.png"
+],
+"WA2000 골드에디션": [
+"weapons/wa2000g.webp",
+"a/a5/Wa2000g.png"
+],
+"귀공녀 최지윤": [
+"classes/buffclass24s4ct.webp",
+"4/45/Buffclass24s4ct.png"
+],
+"길잡이 리트슈카": [
+"classes/buffclass24s4tr.webp",
+"8/84/Buffclass24s4tr.png"
+],
+"밤의 마녀 루나": [
+"classes/buffclass25s3ct.webp",
+"d/dc/Buffclass25s3ct.png"
+],
+"블루래빗 미라주": [
+"classes/buffclass23s2ct.webp",
+"d/d3/Buffclass23s2ct.png"
+],
+"아케인 나베리우스": [
+"weapons/arcane_naberius.webp",
+"9/97/Arcane_naberius.png"
+],
+"알파카 아네모네": [
+"classes/buffclass23s2tr.webp",
+"f/f2/Buffclass23s2tr.png"
+],
+"어비스 리펄서": [
+"weapons/abyss_repulsor.webp",
+"b/b9/Abyss_repulsor.png"
+],
+"에이미": [
+"classes/buffclass25s2tr.webp",
+"5/53/Buffclass25s2tr.png"
+],
+"여왕 이스마엘": [
+"classes/buffclass23s3tr.webp",
+"1/13/Buffclass23s3tr.png"
+],
+"특수요원 메이": [
+"classes/buffclass23s1ct.webp",
+"6/69/Buffclass23s1ct.png"
+],
+"파블로": [
+"classes/buffclass25s2ct.webp",
+"0/01/Buffclass25s2ct.png"
+],
+"폭탄광 유리": [
+"classes/buffclass23s1tr.webp",
+"d/d1/Buffclass23s1tr.png"
+],
+"피의 마녀 블러디": [
+"classes/buffclass25s3tr.webp",
+"f/f1/Buffclass25s3tr.png"
 ]
 };
