@@ -130,14 +130,22 @@ def parse_page(doc):
     ver = re.search(r'class="selectbox"[^>]*>\s*([^<]+?)\s*<', doc)
     period = re.search(r'class="countingPeriodContent"[^>]*>(.*?)</span>\s*</span>', doc, re.S)
     upd = re.search(r'class="lastUpdateContent"[^>]*>\s*([^<]+?)\s*<', doc)
-    notes = []
-    for blk in re.findall(r'<div[^>]*class="ck-content"[^>]*>(.*?)</div>', doc, re.S):
-        for line in re.findall(r'<(?:p|li|h\d)[^>]*>(.*?)</(?:p|li|h\d)>', blk, re.S):
-            t = text_of(line)
-            if t and t not in notes:
-                notes.append(t)
+    def ck_lines(fragment):
+        out = []
+        for blk in re.findall(r'<div[^>]*class="ck-content"[^>]*>(.*?)</div>', fragment, re.S):
+            for line in re.findall(r'<(?:p|li|h\d)[^>]*>(.*?)</(?:p|li|h\d)>', blk, re.S):
+                t = text_of(line)
+                if t and t not in out:
+                    out.append(t)
+        return out
+    notes = ck_lines(doc)
     p = _Tables()
     p.feed(doc)
+    # 표마다 바로 위에 있는 설명 글(예: '티어1 파츠로 진행한 조합 실패 결과입니다.')을 붙임
+    starts = [m.start() for m in re.finditer(r'<table\b', doc)]
+    ends = [0] + [doc.find('</table>', st) + 8 for st in starts[:-1]]
+    for k, t in enumerate(p.tables):
+        t['desc'] = ck_lines(doc[ends[k]:starts[k]]) if k < len(starts) else []
     tables = [t for t in p.tables if t['rows']]
     return {
         'category': category, 'title': title,
@@ -169,12 +177,24 @@ def split_doc(doc):
 # ----------------------------------------------------------------- 해독기 페이지 → 아이템 목록
 def conv_name(n):
     """넥슨 NOW 표기 → 공식 확률 페이지 표기
-       '쿠스토스 (무제한)' → '쿠스토스', '파이슨 데스페라도 (30일_6강)' → '파이슨 데스페라도 - 6강 (30일)'"""
-    m = re.match(r'^(.*?)\s*\((무제한|\d+일)(?:_(\d+)강)?\)\s*$', n)
+       '쿠스토스 (무제한)' → '쿠스토스'
+       '파이슨 데스페라도 (30일_6강)' → '파이슨 데스페라도 - 6강 (30일)'
+       '헌터킬러 X-90 (30일_5강_건부스트 파츠-티어6_뱀피릭 파츠-티어6)'
+         → '헌터킬러 X-90(건부스트 파츠-티어6, 뱀피릭 파츠-티어6) - 5강 (30일)'"""
+    m = re.match(r'^(.*?)\s*\(((?:무제한|\d+일)[^()]*)\)\s*$', n)
     if not m:
         return n.strip()
-    base, per, enh = m.groups()
-    out = base.strip() + (f' - {enh}강' if enh else '')
+    base, inner = m.groups()
+    tok = []
+    for t in (t.strip() for t in inner.split('_')):
+        if t and tok and re.fullmatch(r'티어\d+', t):
+            tok[-1] += '-' + t            # '넉백 업 파츠_티어6' → '넉백 업 파츠-티어6'
+        elif t:
+            tok.append(t)
+    per = tok.pop(0)
+    enh = next((t for t in tok if re.fullmatch(r'\d+강', t)), '')
+    parts = [t for t in tok if t != enh]
+    out = base.strip() + (f"({', '.join(parts)})" if parts else '') + (f' - {enh}' if enh else '')
     return out + (f' ({per})' if per != '무제한' else '')
 
 
@@ -186,11 +206,11 @@ def col(head, *names):
 
 
 def decoder_items(page):
-    """해독기 페이지면 [(이름, 설정확률, 실제결과)] 아니면 None"""
+    """해독기 페이지면 [(이름, 설정확률)] 아니면 None  (실제 결과는 쓰지 않음)"""
     if page['category'] != '해독기' or not page['tables']:
         return None
     t = page['tables'][0]
-    ci, cp, cr = col(t['head'], '아이템'), col(t['head'], '설정 확률', '확률'), col(t['head'], '실제')
+    ci, cp = col(t['head'], '아이템'), col(t['head'], '설정 확률', '확률')
     if ci < 0 or cp < 0:
         return None
     out = []
@@ -199,9 +219,43 @@ def decoder_items(page):
             p = float(r[cp].replace('%', '').replace(',', ''))
         except (ValueError, IndexError):
             continue
-        real = r[cr].replace('%', '').strip() if 0 <= cr < len(r) else ''
-        out.append([conv_name(r[ci]), f'{p:.5f}', real if re.match(r'^[\d.]+$', real) else ''])
+        out.append([conv_name(r[ci]), f'{p:.5f}'])
     return out or None
+
+
+DROP_NOTE = re.compile(r'집계|시도\(사용\)|시도 횟수|한 시간 간격|재집계|영향을 미치지 않는|페이지 안내|데이터 누락|누락된 데이터|데이터센터 장애')
+
+
+def clean_note(n):
+    """안내 문구에서 '실제 결과' 이야기를 빼고, 실제 결과·집계에 관한 문장은 버림 (설정 확률만 다룸)"""
+    if DROP_NOTE.search(n):
+        return ''
+    n = re.sub(r',?\s*그리고 실제 결과', '', n)
+    n = re.sub(r'(과|와)\s*실제 결과', '', n)
+    n = re.sub(r'\s+', ' ', n).strip()
+    return '' if re.fullmatch(r'[※\-\s]*', n) else n
+
+
+def settings_only(page):
+    """설정 확률만 남김: '실제 결과'·'횟수' 칸과 집계 관련 안내 문구 제거
+       설정 확률 칸이 없는 표(실제 결과만 공개하는 표)는 행을 비우고 actual_only 로 표시"""
+    for t in page.get('tables') or []:
+        keep = [i for i, h in enumerate(t['head']) if '실제' not in h and h.strip() != '횟수']
+        if len(keep) != len(t['head']):
+            t['head'] = [t['head'][i] for i in keep]
+            t['rows'] = [[r[i] for i in keep if i < len(r)] for r in t['rows']]
+        has_prob = any(re.search(r'설정 확률|^확률$', h) and '구간' not in h for h in t['head'])
+        if not has_prob:
+            t['rows'], t['actual_only'] = [], True
+        t['desc'] = [d for d in (clean_note(x) for x in t.get('desc', [])) if d]
+    if page.get('items'):
+        page['items'] = [it[:2] for it in page['items']]
+    page['notes'] = [d for d in (clean_note(x) for x in page.get('notes', [])) if d]
+    if page.get('tables'):
+        page['notes'] = []          # 표 페이지는 표마다 설명을 붙이므로 페이지 안내는 생략
+    for k in ('period', 'updated'):
+        page.pop(k, None)
+    return page
 
 
 def page_id(title):
@@ -276,15 +330,19 @@ def main():
             data['menu'] = pg['menu']
         items = decoder_items(pg)
         rec = {'id': page_id(pg['title']), 'category': pg['category'], 'title': pg['title'],
-               'version': pg['version'], 'period': pg['period'], 'updated': pg['updated'],
+               'version': pg['version'],
                'saved': now.strftime('%Y-%m-%d %H:%M'), 'notes': pg['notes'],
                'official': pg['title'] in official_names}
         if items:
             rec['items'] = items
         else:
             rec['tables'] = pg['tables']
+        settings_only(rec)
         old = by_title.get(pg['title'])
-        same = bool(old and old.get('items') == rec.get('items') and old.get('tables') == rec.get('tables')
+        if old:
+            settings_only(old)
+        core = lambda p: [(t['head'], t['rows']) for t in p.get('tables') or []]
+        same = bool(old and old.get('items') == rec.get('items') and core(old) == core(rec)
                     and old.get('version') == rec['version'])
         if same:
             log(f"  (이미 반영된 것과 같은 내용: {rec['title']})")
@@ -292,8 +350,8 @@ def main():
         # 변동 이력 (이전에 올린 적이 있고 내용이 바뀐 경우)
         if old:
             if items and old.get('items') and not rec['official']:
-                a = {n: p for n, p, _ in old['items']}
-                b = {n: p for n, p, _ in items}
+                a = {n[0]: n[1] for n in old['items']}
+                b = {n[0]: n[1] for n in items}
                 for n, p in b.items():
                     if n not in a:
                         hist_entries.append({'dec': rec['id'], 'decName': rec['title'], 'type': 'new', 'item': n, 'to': p})
@@ -303,7 +361,7 @@ def main():
                 for n, p in a.items():
                     if n not in b:
                         hist_entries.append({'dec': rec['id'], 'decName': rec['title'], 'type': 'removed', 'item': n, 'from': p})
-            elif not items and old.get('tables') != rec.get('tables'):
+            elif not items and core(old) != core(rec):
                 hist_entries.append({'dec': rec['id'], 'decName': rec['title'], 'type': 'page_update',
                                      'from': old.get('version', ''), 'to': rec['version']})
         by_title[pg['title']] = rec
@@ -316,7 +374,7 @@ def main():
 
     # 메뉴 순서대로 정렬
     order = [t for _, ts in data['menu'] for t in ts]
-    data['pages'] = sorted(by_title.values(), key=lambda p: order.index(p['title']) if p['title'] in order else 999)
+    data['pages'] = sorted((settings_only(p) for p in by_title.values()), key=lambda p: order.index(p['title']) if p['title'] in order else 999)
     data['imported'] = now.strftime('%Y-%m-%d %H:%M')
     data['last'] = last
 
@@ -324,7 +382,7 @@ def main():
     known = dict(official.get('IMAGES') or {})
     known.update(data.get('images') or {})
     need = {U.base_name(n) for p in data['pages'] if p.get('items') and not p['official']
-            for n, _, _ in p['items']}
+            for n, *_ in p['items']}
     # 상자·강화 등 표: '아이템·구성품·보상' 칸의 이름도 위키에서 찾아봄 (못 찾으면 그냥 글자로 표시)
     for p in data['pages']:
         for t in p.get('tables') or []:

@@ -123,11 +123,10 @@ DEC.forEach(addItems);
 /* ===== 넥슨 NOW (직접 저장해서 올린 페이지, js/nexonnow.js) =====
    - 공식 확률 페이지에 없는 해독기 → 해독기 목록에 추가 (카드·계산기·찜 그대로 사용)
    - 강화·상자 등 → 표 화면
-   - 공식 페이지에도 있는 해독기 → 교차검증 + 실제 결과 표시 */
+   - 공식 페이지에도 있는 해독기 → 교차검증 (확률은 모두 '설정 확률'만 사용) */
 const NOW_URL = 'https://now.nexon.com/service/csonline';
 const NOW = typeof NEXON_NOW !== 'undefined' && NEXON_NOW && NEXON_NOW.pages ? NEXON_NOW : null;
 const NOW_BY_TITLE = new Map();     /* 해독기 이름 → 넥슨 NOW 페이지 */
-const NOW_REAL = new Map();         /* '해독기|아이템' → 실제 결과(%) */
 const NOW_DEC = [];                 /* 넥슨 NOW에만 있는 해독기 id */
 const PAGES = [];                   /* 표로 보여줄 페이지 (강화·상자 등) */
 const PAGE_BY_ID = {};
@@ -138,13 +137,15 @@ if (NOW) {
   NOW.pages.forEach(pg => {
     NOW_BY_TITLE.set(pg.title, pg);
     if (!pg.items) { PAGES.push(pg); PAGE_BY_ID[pg.id] = pg; return; }
-    pg.items.forEach(([n, , r]) => { if (r !== '') NOW_REAL.set(pg.title + '|' + norm(n), +r); });
     if (pg.official || DEC.some(D => D.name === pg.title)) return;
     const rows = []; let cur = null;
+    const gradeByP = {};      /* 같은 확률 묶음에서 아는 아이템의 등급 */
+    pg.items.forEach(([n, p]) => { const k = info.get(baseName(n)); if (k && !gradeByP[p]) gradeByP[p] = k.grade; });
     pg.items.forEach(([n, p]) => {
-      const base = baseName(n), k = info.get(base), im = IMAGES[base];
-      const grade = k ? k.grade : '기타';
-      const type = k ? k.type : im && /^classes\//.test(im[0]) ? 'class' : im && /^weapons\//.test(im[0]) ? 'weapon' : 'etc';
+      const base = baseName(n), k = info.get(base), im = imageOf(base);
+      const grade = k ? k.grade : gradeByP[p] || '기타';
+      const type = k ? k.type : im && /^classes\//.test(im[0]) ? 'class'
+        : /코스튬|마크|도색|스킨|상자|파츠|교환권|쿠폰|포인트|캡슐|조각|재료|스프레이|패키지|칭호|닉네임|캐릭터 카드/.test(n) ? 'etc' : 'weapon';
       const per = periodOf(n) || '무제한';
       if (cur && cur.p === p && cur.grade === grade && cur.type === type && cur.per === per) cur.names.push(n);
       else rows.push(cur = { p, grade, type, per, names: [n] });
@@ -196,7 +197,6 @@ function entryOf(title){
 }
 const NOW_ONLY_DECS = () => (MENU.find(([c]) => c === '해독기') || ['', []])[1].map(entryOf).filter(e => e.kind !== 'official');
 
-const realOf = it => NOW_REAL.get(DEC_BY_ID[it.dec].name + '|' + norm(it.name));
 
 /* 공식 확률 페이지 ↔ 넥슨 NOW 교차검증 (같은 이름의 해독기끼리 아이템·확률 비교) */
 function crossCheck(D){
@@ -275,13 +275,30 @@ function iconFor(it){
   if (/좀비/.test(it.name + it.group)) return ICONS.zombie;
   return ICONS.shirt;
 }
+/* 이미지가 없으면 같은 시리즈(숫자만 다른 이름)의 이미지를 씀: '드라카르 Ⅰ' → '드라카르 Ⅲ' */
+var SERIES_IMG = null;   /* 처음 쓸 때 만듦 (넥슨 NOW 이미지까지 합친 뒤) */
+function imageOf(base){
+  if (!base) return null;
+  if (!SERIES_IMG) {
+    SERIES_IMG = {};
+    for (const k in IMAGES) {
+      const s = k.replace(/[\s\-]*(?:[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]|[IVX]+|\d+)$/, '');
+      if (s && s !== k && !SERIES_IMG[s]) SERIES_IMG[s] = IMAGES[k];
+      SERIES_IMG['~' + k.replace(/\s/g, '')] = IMAGES[k];          /* 띄어쓰기만 다른 이름: '플라즈마건' = '플라즈마 건' */
+    }
+  }
+  if (SERIES_IMG['~' + base.replace(/\s/g, '')]) return SERIES_IMG['~' + base.replace(/\s/g, '')];
+  if (IMAGES[base]) return IMAGES[base];
+  const s = base.replace(/[\s\-]*(?:[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]|[IVX]+|\d+)$/, '');
+  return s !== base ? SERIES_IMG[s] || IMAGES[s] || null : null;
+}
 function imgTag(it){
-  const im = IMAGES[it.base];
+  const im = imageOf(it.base);
   if (!im) return '';
   return `<img src="${IMG_DIR}${im[0]}" data-fb="${WIKI_BASE}${im[1]}/revision/latest" alt="" loading="lazy" decoding="async">`;
 }
 function thumbHTML(it, cls='thumb'){
-  if (it.type === 'class' && IMAGES[it.base]) cls += ' portrait';
+  if (it.type === 'class' && imageOf(it.base)) cls += ' portrait';
   return `<div class="${cls}">${imgTag(it)}<div class="ph">${iconFor(it)}<span>${esc(it.base)}</span></div></div>`;
 }
 /* 이미지: 로컬 → 위키 → 아이콘 */
@@ -355,7 +372,7 @@ function navItem(e, on){
   const attr = e.kind === 'pending' ? `data-pend="${esc(e.title)}"` : e.kind === 'page' ? `data-page="${e.id}"` : `data-id="${e.id}"`;
   const c = e.kind === 'dec' || e.kind === 'official' ? decColor(DEC_BY_ID[e.id]) : e.kind === 'page' ? '#2fd3a4' : '#4a5269';
   const right = e.kind === 'pending' ? '<span class="ct">미반영</span>' : e.kind === 'dec' ? `<span class="ct">${decItems(e.id).length}</span>`
-    : e.kind === 'page' ? `<span class="ct">${e.pg.tables.reduce((a, t) => a + t.rows.length, 0)}행</span>` : '';
+    : e.kind === 'page' ? `<span class="ct">${e.pg.tables.reduce((a, t) => a + t.rows.length, 0) || '–'}${e.pg.tables.some(t => t.rows.length) ? '행' : ''}</span>` : '';
   return `<button class="nav-item${on ? ' on' : ''}${st}" ${attr} style="--c:${c}"><span class="dot"></span><span class="nm">${esc(e.title)}</span>${right}</button>`;
 }
 function renderNav(){
@@ -399,7 +416,6 @@ function renderNav(){
 function nowMeta(pg){
   return `<div class="now-meta">
       <span>넥슨 NOW · ${esc(pg.version || '버전 정보 없음')}</span>
-      ${pg.period ? `<span>집계 ${esc(pg.period)}</span>` : ''}
       <span>저장 ${esc(pg.saved)}</span>
       <a href="${NOW_URL}" target="_blank" rel="noopener">넥슨 NOW ↗</a>
     </div>`;
@@ -446,7 +462,7 @@ function renderHero(){
     hero.innerHTML = `
       <div class="hero-top"><div><div class="kicker">${esc(pg.category)} · 넥슨 NOW에서 가져온 확률</div><h1>${esc(pg.title)}</h1></div></div>
       ${nowMeta(pg)}
-      ${pg.notes.length ? `<ul class="now-notes">${pg.notes.filter(n => !/^※/.test(n)).map(n => `<li>${esc(n.replace(/^-\s*/, ''))}</li>`).join('')}</ul>` : ''}`;
+      ${pg.notes.filter(n => !/^※|실제 결과|집계|한 시간 간격/.test(n)).length ? `<ul class="now-notes">${pg.notes.filter(n => !/^※|실제 결과|집계|한 시간 간격/.test(n)).map(n => `<li>${esc(n.replace(/^-\s*/, ''))}</li>`).join('')}</ul>` : ''}`;
     return;
   }
   if (S.wish && !(S.all && S.q)) {
@@ -612,24 +628,32 @@ function renderResults(){
 const BASE_INFO = new Map();
 ITEMS.forEach(it => { if (!BASE_INFO.has(it.base)) BASE_INFO.set(it.base, it); });
 function cellThumb(c){
-  const base = baseName(c.replace(/\s*\((?:무제한|\d+일)(?:_\d+강)?\)\s*$/, ''));
-  if (!base || !IMAGES[base]) return '';
+  const base = baseName(c.replace(/\s*\((?:무제한|\d+일)[^()]*\)\s*(?:\d+개)?\s*$/, ''));
+  const im = imageOf(base);
+  if (!im) return '';
   const k = BASE_INFO.get(base);
-  return thumbHTML({ base, name: base, type: k ? k.type : /^classes\//.test(IMAGES[base][0]) ? 'class' : 'weapon', grade: k ? k.grade : '기타' }, 'mini');
+  return thumbHTML({ base, name: base, type: k ? k.type : /^classes\//.test(im[0]) ? 'class' : 'weapon', grade: k ? k.grade : '기타' }, 'mini');
 }
 function renderPage(box){
   const pg = PAGE_BY_ID[S.page];
   const q = qnorm(S.q);
   let shown = 0;
-  const tables = pg.tables.map(t => {
+  const tables = pg.tables.map(t0 => {
+    const keep = t0.head.map((h, i) => /실제|^횟수$/.test(h) ? -1 : i).filter(i => i >= 0);   /* 실제 결과·횟수 칸은 표시 안 함 */
+    const t = { head: keep.map(i => t0.head[i]), rows: t0.rows.map(r => keep.map(i => r[i] ?? '')) };
+    /* 표 설명: 첫 줄이 짧은 제목이면 소제목으로 */
+    const desc = (t0.desc || []).slice();
+    const title = desc.length && !/^[※\-]/.test(desc[0]) && desc[0].length <= 30 ? desc.shift() : '';
+    const head = `${title ? `<h3 class="ttitle">${esc(title)}</h3>` : ''}${desc.length ? `<ul class="tdesc">${desc.map(d => `<li>${esc(d.replace(/^[※\-]\s*/, ''))}</li>`).join('')}</ul>` : ''}`;
+    if (t0.actual_only) return `<section class="tblock">${head}<div class="note tnote">넥슨 NOW에서 이 표는 실제 결과(집계)만 공개하고 별도의 설정 확률 칸이 없어요. 이 사이트는 설정 확률만 보여줘서 표는 생략했어요.</div></section>`;
     const rows = q ? t.rows.filter(r => { const s = r.join(' '); return qnorm(s).includes(q) || chosung(qnorm(s)).includes(q); }) : t.rows;
     shown += rows.length;
-    const isP = t.head.map(h => /확률|결과|%/.test(h));
+    const isP = t.head.map(h => /확률|%/.test(h));
     const num = t.head.map((h, i) => t.rows.every(r => /^[\d.,%+\-~\s]*$/.test(r[i] || '')));
-    return `<table class="tbl ntbl"><thead><tr>${t.head.map((h, i) => `<th class="${num[i] ? 'num' : ''}">${esc(h)}</th>`).join('')}</tr></thead><tbody>
+    return `<section class="tblock">${head}<table class="tbl ntbl"><thead><tr>${t.head.map((h, i) => `<th class="${num[i] ? 'num' : ''}">${esc(h)}</th>`).join('')}</tr></thead><tbody>
       ${rows.map(r => `<tr>${r.map((c, i) => { const th = num[i] ? '' : cellThumb(c);
         return `<td class="${num[i] ? 'num' : ''}${isP[i] && /%/.test(c) ? ' p' : ''}">${th ? `<div class="cellimg">${th}<span>${esc(c)}</span></div>` : esc(c)}</td>`; }).join('')}</tr>`).join('')}
-      </tbody></table>`;
+      </tbody></table></section>`;
   });
   $('#activeFilters').innerHTML = `<span>${shown.toLocaleString()}행${S.q ? ` · 검색: ${esc(S.q)}` : ''}</span>`;
   box.innerHTML = `<div class="ntables" style="--c:var(--accent)">${tables.join('')}</div>`;
@@ -642,7 +666,8 @@ function renderSec(box){
     .filter(e => !q || qnorm(e.title).includes(q) || chosung(qnorm(e.title)).includes(q));
   $('#activeFilters').innerHTML = `<span>${list.length}개 메뉴</span>`;
   box.innerHTML = `<div class="secgrid">${list.map(e => {
-    const pg = e.pg, rows = pg ? (pg.tables ? pg.tables.reduce((a, t) => a + t.rows.length, 0) + '행' : pg.items.length + '종') : '';
+    const pg = e.pg, nr = pg && pg.tables ? pg.tables.reduce((a, t) => a + t.rows.length, 0) : 0;
+    const rows = pg ? (pg.tables ? (nr ? nr + '행' : '설정 확률 없음') : pg.items.length + '종') : '';
     const head = pg && pg.tables ? pg.tables[0].head.join(' · ') : '';
     return `<button class="stile${e.kind === 'pending' ? ' pending' : ''}" ${e.kind === 'pending' ? `data-pend="${esc(e.title)}"` : e.kind === 'page' ? `data-page="${e.id}"` : `data-id="${e.id}"`}>
       <span class="si">${SEC_ICON[S.sec] || ICONS.box}</span>
@@ -774,7 +799,7 @@ function openDetail(id){
       <div class="d-title"><span class="tag grade">${esc(it.grade)}</span>${it.period ? `<span class="tag period">${it.period}</span>` : ''}<h2 id="dTitle">${esc(it.name)}</h2>${starHTML(it, 'star big')}</div>
       <div class="d-sub">${esc(D.name)} · ${esc(it.group || '(이름 없음)')}</div>
       <div class="d-stats">
-        <div class="d-stat"><div class="k">획득 확률 (${D.now ? '넥슨 NOW' : '공식'})</div><div class="v c">${pFull(it.p)}${realOf(it) !== undefined ? `<small>실제 결과 ${realOf(it).toFixed(5)}%</small>` : ''}</div></div>
+        <div class="d-stat"><div class="k">획득 확률 (${D.now ? '넥슨 NOW' : '공식'})</div><div class="v c">${pFull(it.p)}</div></div>
         <div class="d-stat"><div class="k">평균 기대 횟수${pr ? ' · 비용' : ''}</div><div class="v">${oneIn(it.p)}회${costLine(100 / it.p)}</div></div>
         <div class="d-stat"><div class="k">50% / 90% 확률로 얻으려면</div><div class="v">${triesFor(it.p,.5).toLocaleString()} / ${triesFor(it.p,.9).toLocaleString()}회${pr ? `<small>≈ ${won(pr * triesFor(it.p,.5))} / ${won(pr * triesFor(it.p,.9))}</small>` : ''}</div></div>
       </div>
@@ -907,7 +932,7 @@ document.querySelector('.brand').addEventListener('click', e => { e.preventDefau
 $('#updated').textContent = UPDATED;
 if (HIST.length && RECENT_DEC.size) $('#histBtn').classList.add('fresh');
 if (NOW) $('#nowInfo').textContent = `넥슨 NOW 확률(추가 해독기·강화·상자 등)은 직접 저장해 올린 파일 기준이며 자동 업데이트되지 않습니다. 마지막 반영 ${NOW.imported}`
-  + (NOW.last && NOW.last.length ? ` — ${NOW.last.map(l => `${l.category} > ${l.title}${l.same ? '(이전과 같은 내용)' : ''}`).join(', ')}` : '') + '.';
+  + (NOW.last && NOW.last.length ? ` · 메뉴 ${NOW.last.length}개${NOW.last.every(l => l.same) ? ' (모두 이전과 같은 내용)' : ` (바뀐 메뉴 ${NOW.last.filter(l => !l.same).length}개)`}` : '') + '.';
 if (typeof LAST_CHANGES !== 'undefined' && LAST_CHANGES && (LAST_CHANGES.changed.length || LAST_CHANGES.removed.length)) {
   const parts = [];
   if (LAST_CHANGES.changed.length) parts.push('변경: ' + LAST_CHANGES.changed.join(', '));
