@@ -1,0 +1,68 @@
+# 카스온라인 확률 자동 업데이트 + 사이트 배포
+# - 매일 오전 9시 17분, 오후 9시 17분(한국 시간)에 공식 확률 페이지를 확인합니다.
+# - 바뀐 내용이 있으면 js/data.js 를 고쳐 저장하고 사이트를 다시 올립니다.
+# - Actions 탭에서 "Run workflow" 버튼으로 바로 실행할 수도 있습니다.
+name: 확률 자동 업데이트
+
+on:
+  schedule:
+    - cron: '17 0,12 * * *'   # UTC 기준 → 한국 09:17, 21:17
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  update-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 파이썬 준비
+        if: github.event_name != 'push'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 공식 확률 페이지 확인
+        if: github.event_name != 'push'
+        run: |
+          pip install --quiet requests
+          python scripts/update_data.py
+
+      - name: 바뀐 내용 저장
+        if: github.event_name != 'push'
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "확률 데이터 자동 업데이트 ($(TZ=Asia/Seoul date +%F))"
+            git push
+          else
+            echo "변경 없음"
+          fi
+
+      - name: 사이트 파일 모으기
+        run: |
+          mkdir -p _site
+          cp -r index.html css js images _site/
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - name: 사이트 배포
+        id: deploy
+        uses: actions/deploy-pages@v4
