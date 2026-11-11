@@ -73,7 +73,8 @@ jobs:
         if: github.event_name != 'schedule' || steps.update.outputs.changed == 'true' || steps.nownx.outputs.changed == 'true'
         run: |
           mkdir -p _site
-          cp -r index.html css js images _site/
+          cp -r index.html now-helper.html css js images _site/
+          mkdir -p _site/tools && cp tools/now-collector.js _site/tools/
 
       - uses: actions/configure-pages@v5
         if: steps.build.outcome == 'success'

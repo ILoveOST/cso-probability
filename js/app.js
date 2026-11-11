@@ -419,7 +419,7 @@ function renderHero(){
         <span class="check bad">아직 반영 안 됨</span></div></div>
       <p class="pend-desc">넥슨 NOW에는 있지만 아직 이 사이트에 올라오지 않은 메뉴예요.</p>
       <ol class="pend-steps">
-        <li><a href="${NOW_URL}" target="_blank" rel="noopener">넥슨 NOW ↗</a>에서 <b>${esc(S.pend)}</b> 메뉴를 열고 <kbd>Ctrl</kbd>+<kbd>S</kbd>로 저장</li>
+        <li><a href="now-helper.html">넥슨 NOW 전체 저장 버튼</a>으로 모든 메뉴를 파일 하나로 저장 (또는 이 메뉴만 열고 <kbd>Ctrl</kbd>+<kbd>S</kbd>)</li>
         <li><a href="${UPLOAD_URL}" target="_blank" rel="noopener">GitHub nexon-now 폴더에 올리기 ↗</a> (저장소 관리자만 가능)</li>
         <li>1~2분 뒤 자동으로 반영돼요</li>
       </ol>`;
@@ -437,7 +437,7 @@ function renderHero(){
           <div class="fact"><div class="k">반영됨</div><div class="v">${done}개</div></div>
         </div>
       </div>
-      <p class="pend-desc">${esc(SEC_DESC[S.sec] || '')}을 메뉴별로 정리했어요. 넥슨 NOW 화면을 저장해서 올리면 반영돼요 (자동 업데이트 대상 아님).</p>`;
+      <p class="pend-desc">${esc(SEC_DESC[S.sec] || '')}을 메뉴별로 정리했어요. 넥슨 NOW 화면을 저장해서 올리면 반영돼요 (자동 업데이트 대상 아님) · <a href="now-helper.html">전체 저장 버튼 사용법</a></p>`;
     return;
   }
   if (S.page && !(S.all && S.q)) {

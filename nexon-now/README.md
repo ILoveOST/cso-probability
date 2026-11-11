@@ -1,5 +1,9 @@
 # 넥슨 NOW 저장 파일 올리는 곳
 
+**가장 쉬운 방법:** 사이트의 [넥슨 NOW 전체 저장 버튼](https://iloveost.github.io/cso-probability/now-helper.html)으로 모든 메뉴를 파일 하나(`nexon-now-all_날짜.html`)로 저장해서 이 폴더에 올리세요.
+
+메뉴 하나만 올릴 때:
+
 1. 넥슨 NOW 카스온라인 확률 페이지에서 원하는 메뉴(해독기·강화·상자 등)를 엽니다.
 2. `Ctrl + S` → "웹페이지, 전체"(.html) 또는 "웹페이지, 단일 파일"(.mhtml)로 저장합니다. 파일 이름은 아무거나 괜찮습니다.
 3. 이 폴더(`nexon-now`)에서 **Add file → Upload files** 를 누르고 저장한 파일을 끌어다 놓은 뒤 **Commit changes** 를 누릅니다.

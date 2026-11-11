@@ -139,18 +139,31 @@ def parse_page(doc):
     p = _Tables()
     p.feed(doc)
     tables = [t for t in p.tables if t['rows']]
-    # 넥슨 NOW 왼쪽 메뉴 순서 (사이트 메뉴 순서로 사용)
-    menu = []
-    for cat, inner in re.findall(r'<li class="main"><span[^>]*>([^<]+)</span><ul>(.*?)</ul></li>', doc, re.S):
-        menu.append([cat.strip(), [htmllib.unescape(x).strip()
-                                   for x in re.findall(r'class="select-menu"[^>]*>([^<]+)<', inner)]])
     return {
         'category': category, 'title': title,
         'version': (ver.group(1).strip() if ver else ''),
         'period': text_of(period.group(1)) if period else '',
         'updated': upd.group(1).strip() if upd else '',
-        'notes': notes, 'tables': tables, 'menu': menu,
+        'notes': notes, 'tables': tables, 'menu': parse_menu(doc),
     }
+
+
+def parse_menu(doc):
+    """넥슨 NOW 왼쪽 메뉴 순서 (사이트 탭·메뉴 순서로 사용)"""
+    menu = []
+    for cat, inner in re.findall(r'<li[^>]*class="main"[^>]*>\s*<span[^>]*>([^<]+)</span>\s*<ul[^>]*>(.*?)</ul>\s*</li>', doc, re.S):
+        menu.append([htmllib.unescape(cat).strip(), [htmllib.unescape(x).strip()
+                     for x in re.findall(r'class="select-menu"[^>]*>([^<]+)<', inner)]])
+    return menu
+
+
+def split_doc(doc):
+    """'넥슨NOW 전체 저장' 버튼으로 만든 파일이면 메뉴별로 나눔 → (메뉴 순서, [화면들])"""
+    if 'id="nownx-bundle"' not in doc:
+        return None, [doc]
+    body = doc.split('<!--NOWNX-END-->')[0]
+    parts = body.split('<!--NOWNX-SECTION-->')
+    return parse_menu(parts[0]), parts[1:]
 
 
 # ----------------------------------------------------------------- 해독기 페이지 → 아이템 목록
@@ -239,14 +252,25 @@ def main():
     official_names = {D['name'] for D in official['DECODERS']}
     hist_entries, done, last = [], [], []
 
+    docs = []
     for path in files:
         try:
-            pg = parse_page(read_saved(path))
+            bmenu, parts = split_doc(read_saved(path))
+        except Exception as e:  # noqa: BLE001
+            log(f'읽기 실패: {os.path.basename(path)} ({e})')
+            continue
+        if bmenu:
+            data['menu'] = bmenu
+            log(f'전체 저장 파일: {os.path.basename(path)} — 메뉴 {len(parts)}개')
+        docs += [(path, d) for d in parts]
+    for path, doc in docs:
+        try:
+            pg = parse_page(doc)
         except Exception as e:  # noqa: BLE001
             log(f'읽기 실패: {os.path.basename(path)} ({e})')
             continue
         if not pg or not pg['tables']:
-            log(f'확률표를 찾지 못함(건너뜀): {os.path.basename(path)} — 표가 보이는 상태에서 저장했는지 확인')
+            log(f"확률표를 찾지 못함(건너뜀): {os.path.basename(path)} {pg['title'] if pg else ''} — 표가 보이는 상태에서 저장했는지 확인")
             continue
         if pg['menu']:
             data['menu'] = pg['menu']

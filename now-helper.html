@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>넥슨 NOW 전체 저장 버튼</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .helper{max-width:760px;margin:0 auto;padding:28px 16px 60px}
+  .helper h1{font-size:24px;margin:0 0 6px;letter-spacing:-.02em}
+  .helper .lead{color:var(--sub);margin:0 0 22px}
+  .step{display:grid;grid-template-columns:34px 1fr;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:10px}
+  .step .n{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:var(--accent-ink);font-weight:900}
+  .step h2{font-size:15px;margin:5px 0 6px}
+  .step p{margin:0;color:var(--sub);font-size:13px}
+  .step kbd{font-family:inherit;font-size:12px;border:1px solid var(--line2);border-radius:5px;padding:0 6px;color:var(--text)}
+  .bm{display:inline-flex;align-items:center;gap:8px;margin:10px 0 4px;padding:10px 16px;border-radius:10px;background:var(--accent);color:var(--accent-ink);font-weight:800;cursor:grab;text-decoration:none!important}
+  .bm:active{cursor:grabbing}
+  .alt{margin-top:10px;font-size:12px;color:var(--muted)}
+  .alt button{border:1px solid var(--line2);background:var(--panel2);border-radius:8px;padding:4px 10px;font-size:12px;color:var(--text)}
+  .note{margin-top:18px;font-size:12px;color:var(--muted);line-height:1.6}
+  .back{display:inline-block;margin-bottom:18px;font-size:13px}
+</style>
+</head>
+<body>
+<main class="helper">
+  <a class="back" href="./">← 해독기 확률 도감으로</a>
+  <h1>넥슨 NOW 전체 저장 버튼</h1>
+  <p class="lead">넥슨 NOW 화면에서 버튼 한 번만 누르면 해독기·강화·개조·상자·파츠·각성 메뉴를 차례로 열어서 모든 확률표를 <b>파일 하나</b>로 저장해요.</p>
+
+  <div class="step"><div class="n">1</div><div>
+    <h2>즐겨찾기 막대 켜기</h2>
+    <p>크롬에서 <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>B</kbd>를 누르면 주소창 아래에 즐겨찾기 막대가 나타나요. (이미 보이면 넘어가세요)</p>
+  </div></div>
+
+  <div class="step"><div class="n">2</div><div>
+    <h2>아래 노란 버튼을 즐겨찾기 막대로 끌어다 놓기</h2>
+    <p>버튼을 <b>누르지 말고</b>, 마우스로 잡아서 즐겨찾기 막대 위에 놓으세요. 처음 한 번만 하면 돼요.</p>
+    <a class="bm" id="bm" href="#" onclick="alert('이 버튼은 누르는 게 아니라 즐겨찾기 막대로 끌어다 놓는 버튼이에요.');return false;">⬇ 넥슨NOW 전체 저장</a>
+    <div class="alt">끌어다 놓기가 안 되면: <button id="copy" type="button">버튼 코드 복사</button> → 즐겨찾기 막대에서 마우스 오른쪽 → <b>페이지 추가</b> → 이름은 "넥슨NOW 전체 저장", URL 칸에 붙여넣기(<kbd>Ctrl</kbd>+<kbd>V</kbd>) → 저장</div>
+  </div></div>
+
+  <div class="step"><div class="n">3</div><div>
+    <h2>넥슨 NOW에서 버튼 누르기</h2>
+    <p><a href="https://now.nexon.com/service/csonline" target="_blank" rel="noopener">넥슨 NOW 카스온라인 확률 페이지 ↗</a>를 열고, 즐겨찾기 막대의 <b>넥슨NOW 전체 저장</b>을 누르세요.
+      오른쪽 아래에 진행 상황이 나오고 메뉴가 자동으로 하나씩 바뀌어요. 메뉴 34개 기준 1분쯤 걸리니 끝날 때까지 그대로 두세요.</p>
+  </div></div>
+
+  <div class="step"><div class="n">4</div><div>
+    <h2>내려받은 파일 올리기</h2>
+    <p>끝나면 <b>nexon-now-all_날짜.html</b> 파일 하나가 다운로드돼요. 이 파일을
+      <a href="https://github.com/ILoveOST/cso-probability/upload/main/nexon-now" target="_blank" rel="noopener">GitHub nexon-now 폴더 ↗</a>에 끌어다 놓고 <b>Commit changes</b>를 누르면 1~2분 뒤 사이트에 전부 반영돼요.</p>
+  </div></div>
+
+  <p class="note">· 버튼은 내 브라우저에서 메뉴를 사람이 누르는 속도로 차례로 눌러 보이는 표를 모으기만 해요. 다른 사이트로 아무것도 보내지 않아요.<br>
+    · 패치로 확률이 바뀌었을 때(보통 1년에 4번 정도) 다시 한 번 누르고 올리면 돼요.<br>
+    · 저장소 업로드는 저장소 주인만 할 수 있어요.</p>
+</main>
+<script>
+fetch('tools/now-collector.js').then(r => r.text()).then(code => {
+  const href = 'javascript:' + encodeURIComponent(code);
+  document.getElementById('bm').href = href;
+  document.getElementById('bm').onclick = () => { alert('이 버튼은 누르는 게 아니라 즐겨찾기 막대로 끌어다 놓는 버튼이에요.'); return false; };
+  document.getElementById('copy').onclick = async () => {
+    try { await navigator.clipboard.writeText(href); document.getElementById('copy').textContent = '복사됨 ✓'; }
+    catch { prompt('아래 내용을 전부 복사하세요 (Ctrl+C)', href); }
+  };
+}).catch(() => { document.getElementById('bm').textContent = '버튼을 불러오지 못했어요. 새로고침해 주세요.'; });
+</script>
+</body>
+</html>
