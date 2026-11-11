@@ -47,7 +47,7 @@ jobs:
       - name: 넥슨 NOW 저장 파일 반영
         id: nownx
         run: |
-          if ls nexon-now/*.htm* nexon-now/*.mht* >/dev/null 2>&1; then
+          if ls nexon-now/ | grep -qiE '\.(html?|mhtml?)$'; then
             pip install --quiet requests
             python scripts/import_nexon_now.py
             echo "changed=true" >> "$GITHUB_OUTPUT"
