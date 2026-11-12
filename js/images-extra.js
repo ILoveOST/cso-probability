@@ -162,7 +162,7 @@ const IMAGES_EXTRA = {
 "f/f1/Buffclass25s3tr.png"
 ],
 "아이리": [
-"classes/ohoho.webp",
-"f/fd/Ohoho.png"
+"classes/airi.webp",
+""
 ]
 };
