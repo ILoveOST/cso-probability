@@ -439,6 +439,13 @@ def main():
     menu_html = page('menu')
     menu = parse_menu(menu_html)
     if len(menu) < 5:
+        # 원인 확인용: 받은 화면의 제목·글자·링크 일부를 로그에 남김
+        title = re.search(r'<title[^>]*>(.*?)</title>', menu_html, re.S)
+        text = re.sub(r'\s+', ' ', re.sub(r'<script.*?</script>|<style.*?</style>|<[^>]+>', ' ', menu_html, flags=re.S))
+        log(f'[진단] 받은 화면 크기 {len(menu_html)}자, 제목: {title.group(1).strip() if title else "-"}')
+        log(f'[진단] 글자: {text[:600]}')
+        log('[진단] Probability 링크: ' + ' | '.join(re.findall(r'href="([^"]*Probab[^"]*)"', menu_html)[:15]))
+        log('[진단] 점검 문구: ' + ('있음' if re.search(r'점검|maintenance', menu_html, re.I) else '없음'))
         raise SystemExit(f'해독기 목록을 제대로 읽지 못함 ({len(menu)}개) — 넥슨 페이지 구조가 바뀌었는지 확인 필요')
     log(f'해독기 {len(menu)}개 확인')
     # 해독기 말고 다른 확률 페이지(상자·강화 등)가 생겼는지 기록만 남김
