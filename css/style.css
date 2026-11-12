@@ -318,6 +318,8 @@ dialog::backdrop{background:rgba(4,6,10,.72);backdrop-filter:blur(3px)}
 .now-notes li{margin:2px 0}
 .check{margin-top:8px;border:1px solid var(--line2);background:rgba(0,0,0,.2);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700}
 .check.ok{color:#3fc98a;border-color:color-mix(in srgb,#3fc98a 45%,transparent)}
+.check.now{color:#7dbdff;border-color:color-mix(in srgb,#4aa3ff 55%,transparent)}
+.nav-item .ck.now{color:#7dbdff}
 .check.bad{color:#ffb53d;border-color:color-mix(in srgb,#ffb53d 55%,transparent)}
 .ntables{display:grid;gap:14px}
 .ntbl{table-layout:auto}

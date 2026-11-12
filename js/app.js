@@ -145,6 +145,13 @@ if (NOW) {
     NOW_DEC.push(pg.id);
   });
   function buildNowDecoder(pg, entries, sec){
+    const D = { id: pg.id, name: pg.title, now: pg, sec, boxName: pg.tables && pg.tables[0].rows[0] ? pg.tables[0].rows[0][0] : '',
+      rows: nowRows(entries, info) };
+    DEC.push(D); DEC_BY_ID[D.id] = D; addItems(D);
+  }
+}
+/* 넥슨 NOW 항목 [[이름, 확률]] → 해독기 행 (같은 확률·등급·종류·기간끼리 묶음) */
+function nowRows(entries, info){
     const rows = []; let cur = null;
     const gradeByP = {};      /* 같은 확률 묶음에서 아는 아이템의 등급 */
     entries.forEach(([n, p]) => { const k = info.get(baseName(n)); if (k && !gradeByP[p]) gradeByP[p] = k.grade; });
@@ -157,10 +164,7 @@ if (NOW) {
       if (cur && cur.p === p && cur.grade === grade && cur.type === type && cur.per === per) cur.names.push(n);
       else rows.push(cur = { p, grade, type, per, names: [n] });
     });
-    const D = { id: pg.id, name: pg.title, now: pg, sec, boxName: pg.tables && pg.tables[0].rows[0] ? pg.tables[0].rows[0][0] : '',
-      rows: rows.map(r => { LISTS.push(r.names.join('|')); return [`개당 ${(+r.p).toFixed(5)}% · ${r.per}`, r.p, LISTS.length - 1, r.grade, r.type]; }) };
-    DEC.push(D); DEC_BY_ID[D.id] = D; addItems(D);
-  }
+    return rows.map(r => { LISTS.push(r.names.join('|')); return [`개당 ${(+r.p).toFixed(5)}% · ${r.per}`, r.p, LISTS.length - 1, r.grade, r.type]; });
 }
 /* 상자 표(상자 종류 · 아이템 · 설정 확률) → [[아이템 이름, 확률]]
    이름 정리: '볼케이노 (무제한) 1개 9강' → '볼케이노 - 9강', '시프트 코어 (무제한) 3개' → '시프트 코어 3개', 'X (7일) 1개' → 'X (7일)' */
@@ -230,7 +234,8 @@ function crossCheck(D){
   /* 이름별로 확률을 모아서 비교. 소수점 다섯째 자리 반올림 차이(±0.00001%)는 같은 확률로 봄 */
   const a = new Map(), b = new Map(), label = (n, p) => `${n} ${(+p).toFixed(5)}%`;
   const add = (m, n, p) => { const k = norm(n); if (!m.has(k)) m.set(k, []); m.get(k).push([+p, n]); };
-  ITEMS.forEach(it => { if (it.dec === D.id) add(a, it.name, it.p); });
+  if (D.officialRows) D.officialRows.forEach(r => LISTS[r[2]].split('|').forEach(n => add(a, n, r[1])));
+  else ITEMS.forEach(it => { if (it.dec === D.id) add(a, it.name, it.p); });
   pg.items.forEach(([n, p]) => add(b, n, p));
   let match = 0; const onlyNow = [], onlyOff = [];
   for (const [k, bl] of b) {
@@ -243,6 +248,30 @@ function crossCheck(D){
   }
   for (const al of a.values()) al.forEach(([p, n]) => onlyOff.push(label(n, p)));
   return { pg, match, ok: !onlyNow.length && !onlyOff.length, onlyNow, onlyOff };
+}
+
+/* ===== 공식 페이지 ↔ 넥슨 NOW가 서로 다르면 더 최근에 반영된 쪽을 보여줌 =====
+   - 넥슨 NOW 저장 시각이 공식 페이지가 마지막으로 바뀐 시각보다 나중이면 → 넥슨 NOW 기준 (예: 패치 직후 넥슨 NOW를 먼저 올린 경우)
+   - 아니면 → 공식 페이지 기준 (넥슨 NOW 저장본이 옛 버전)
+   - 둘이 같으면 공식 페이지의 묶음 이름·등급을 그대로 사용 (숫자는 같음) */
+const OFFICIAL_CHANGED = {};      /* 해독기 id → 공식 페이지에서 마지막으로 바뀐 시각 (변경 기록 기준) */
+(typeof HISTORY !== 'undefined' ? HISTORY : []).forEach(e => e.changes.forEach(c => {
+  const t = `${e.date} ${e.time || '00:00'}`;
+  if (c.dec && c.type !== 'page_update' && (!OFFICIAL_CHANGED[c.dec] || t > OFFICIAL_CHANGED[c.dec])) OFFICIAL_CHANGED[c.dec] = t;
+}));
+if (NOW) {
+  const info = new Map();
+  ITEMS.forEach(it => { if (!info.has(it.base)) info.set(it.base, it); });
+  let swapped = false;
+  DEC.forEach(D => {
+    if (D.now) return;
+    const c = crossCheck(D);
+    if (!c || c.ok) return;
+    if (c.pg.saved >= (OFFICIAL_CHANGED[D.id] || '')) {
+      D.officialRows = D.rows; D.rows = nowRows(c.pg.items, info); D.nowOverride = c.pg; swapped = true;
+    } else D.officialNewer = true;
+  });
+  if (swapped) { ITEMS.length = 0; DEC.forEach(addItems); }
 }
 
 /* 자동 업데이트로 새 해독기가 생기면 이름으로 분류해 넣고, 사라진 해독기는 목록에서 뺌 */
@@ -426,7 +455,7 @@ function renderNav(){
     html += cats.map(([cat, ids]) => `<div class="nav-cat"><h3>${cat}</h3>
       ${ids.map(id => { const D = DEC_BY_ID[id], ck = crossCheck(D);
         return `<button class="nav-item${id === S.dec && !isSpecial() && !searching ? ' on' : ''}" data-id="${id}" style="--c:${decColor(D)}">
-          <span class="dot"></span><span class="nm">${esc(D.name)}</span>${ck ? `<span class="ck ${ck.ok ? 'ok' : 'bad'}" title="넥슨 NOW 교차검증 ${ck.ok ? '일치' : '다름'}">${ck.ok ? '✓' : '!'}</span>` : ''}<span class="ct">${decItems(id).length}</span></button>`; }).join('')}
+          <span class="dot"></span><span class="nm">${esc(D.name)}</span>${ck ? `<span class="ck ${ck.ok ? 'ok' : D.nowOverride ? 'now' : 'bad'}" title="${ck.ok ? '넥슨 NOW와 교차검증 일치' : D.nowOverride ? '넥슨 NOW 기준으로 표시 중 (공식 페이지는 이전 확률)' : '공식 페이지 기준 (넥슨 NOW 저장본이 이전 버전)'}">${ck.ok ? '✓' : D.nowOverride ? 'N' : '!'}</span>` : ''}<span class="ct">${decItems(id).length}</span></button>`; }).join('')}
       </div>`).join('');
     const extra = NOW_ONLY_DECS();
     if (extra.length) html += `<div class="nav-cat"><h3>넥슨 NOW 해독기 <span class="now-tag">NOW</span></h3>
@@ -457,8 +486,11 @@ function nowMeta(pg){
 }
 function checkLine(D){
   const c = crossCheck(D); if (!c) return '';
-  return `<button class="check ${c.ok ? 'ok' : 'bad'}" data-check="${D.id}">${c.ok
-    ? `✓ 넥슨 NOW와 교차검증 일치 (${c.match}개)` : `⚠ 넥슨 NOW와 ${c.onlyNow.length + c.onlyOff.length}곳 다름 · 자세히`}</button>`;
+  const n = c.onlyNow.length + c.onlyOff.length;
+  return `<button class="check ${c.ok ? 'ok' : D.nowOverride ? 'now' : 'bad'}" data-check="${D.id}">${c.ok
+    ? `✓ 넥슨 NOW와 교차검증 일치 (${c.match}개)`
+    : D.nowOverride ? `넥슨 NOW 기준으로 표시 중 · 공식 페이지는 아직 이전 확률 (${n}곳 다름) · 자세히`
+    : `⚠ 공식 페이지 기준 · 넥슨 NOW 저장본이 이전 버전 (${n}곳 다름) · 자세히`}</button>`;
 }
 /* 상자 그림: 상자 종류 이름(예: 시프트 코어 상자) 또는 메뉴 이름으로 */
 function boxPic(D){
@@ -552,6 +584,7 @@ function renderHero(){
         <div class="fact"><div class="k">${esc(top)} 등급 합계</div><div class="v" style="color:${GC[top]}">${pSum(byG[top])}</div></div>
       </div>
     </div>
+    ${D.nowOverride ? nowMeta(D.nowOverride) : ''}
     ${D.now ? nowMeta(D.now) + (D.sec ? (D.now.tables[0].desc || []).map(d => `<p class="dist-hint">${esc(d.replace(/^[※\-]\s*/, ''))}</p>`).join('') : '')
       + `<p class="dist-hint">${D.sec ? '넥슨 NOW에서 가져온 확률' : '공식 확률 페이지에 없는 해독기'}라 자동 업데이트되지 않아요. 넥슨 NOW 화면을 다시 저장해서 올리면 갱신돼요.</p>` : ''}
     <div class="price-row">
@@ -727,6 +760,7 @@ function openCheck(id){
   hdlg.innerHTML = `<div class="h-head"><h2 id="hTitle">${esc(D.name)} 교차검증</h2>
       <button class="d-close" data-close aria-label="닫기">${ICONS.close}</button></div>
     <p class="h-desc">공식 확률 페이지(자동, ${UPDATED} 기준)와 넥슨 NOW 저장본(${esc(c.pg.saved)} 저장 · ${esc(c.pg.version)})을 아이템 이름과 확률로 비교했어요.
+      둘이 다르면 더 최근에 반영된 쪽을 보여줘요 — 지금은 <b>${c.ok ? '둘이 같아요' : D.nowOverride ? '넥슨 NOW 기준' : '공식 페이지 기준'}</b>.
       패치 직후에는 한쪽만 먼저 바뀌어서 잠깐 다를 수 있어요.</p>
     <div class="h-body">
       <p><b>${c.match}개 일치</b>${c.ok ? ' · 모두 같아요 ✓' : ''}</p>

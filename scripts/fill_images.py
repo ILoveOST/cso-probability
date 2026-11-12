@@ -173,6 +173,7 @@ MANUAL = {
     '폭탄광 유리': ('Pyromaniac Yuri', None, True),
     '에이미': ('Amy', None, True),
     '파블로': ('Pablo', None, True),
+    '아이리': ('Airi', None, True),
 }
 
 
