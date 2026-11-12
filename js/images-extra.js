@@ -160,5 +160,9 @@ const IMAGES_EXTRA = {
 "피의 마녀 블러디": [
 "classes/buffclass25s3tr.webp",
 "f/f1/Buffclass25s3tr.png"
+],
+"아이리": [
+"classes/ohoho.webp",
+"f/fd/Ohoho.png"
 ]
 };
