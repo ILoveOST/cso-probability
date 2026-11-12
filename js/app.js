@@ -140,7 +140,7 @@ if (NOW) {
     const box = boxEntries(pg);
     if (box) { buildNowDecoder(pg, box, pg.category); return; }        /* 상자 → 해독기처럼 카드로 */
     if (!pg.items) { PAGES.push(pg); PAGE_BY_ID[pg.id] = pg; return; }
-    if (pg.official || DEC.some(D => D.name === pg.title)) return;
+    if (DEC.some(D => D.name === pg.title)) return;     /* 공식 페이지에 있으면 공식 데이터 사용 (빠지면 넥슨 NOW 데이터로 계속 표시) */
     buildNowDecoder(pg, pg.items, null);
     NOW_DEC.push(pg.id);
   });
@@ -227,14 +227,21 @@ const NOW_ONLY_DECS = () => (MENU.find(([c]) => c === '해독기') || ['', []])[
 function crossCheck(D){
   const pg = NOW_BY_TITLE.get(D.name);
   if (!pg || !pg.items || D.now) return null;
-  const label = new Map(), cnt = (m, name, p) => {
-    const k = norm(name) + '@' + (+p).toFixed(5); label.set(k, `${name} ${(+p).toFixed(5)}%`); m.set(k, (m.get(k) || 0) + 1); };
-  const a = new Map(), b = new Map();
-  ITEMS.forEach(it => { if (it.dec === D.id) cnt(a, it.name, it.p); });
-  pg.items.forEach(([n, p]) => cnt(b, n, p));
+  /* 이름별로 확률을 모아서 비교. 소수점 다섯째 자리 반올림 차이(±0.00001%)는 같은 확률로 봄 */
+  const a = new Map(), b = new Map(), label = (n, p) => `${n} ${(+p).toFixed(5)}%`;
+  const add = (m, n, p) => { const k = norm(n); if (!m.has(k)) m.set(k, []); m.get(k).push([+p, n]); };
+  ITEMS.forEach(it => { if (it.dec === D.id) add(a, it.name, it.p); });
+  pg.items.forEach(([n, p]) => add(b, n, p));
   let match = 0; const onlyNow = [], onlyOff = [];
-  for (const [k, c] of b) { const m = Math.min(c, a.get(k) || 0); match += m; for (let i = m; i < c; i++) onlyNow.push(label.get(k)); }
-  for (const [k, c] of a) { const m = Math.min(c, b.get(k) || 0); for (let i = m; i < c; i++) onlyOff.push(label.get(k)); }
+  for (const [k, bl] of b) {
+    const al = (a.get(k) || []).slice();
+    for (const [p, n] of bl) {
+      const i = al.findIndex(([q]) => Math.abs(q - p) < 0.0000101);
+      if (i >= 0) { al.splice(i, 1); match++; } else onlyNow.push(label(n, p));
+    }
+    a.set(k, al);
+  }
+  for (const al of a.values()) al.forEach(([p, n]) => onlyOff.push(label(n, p)));
   return { pg, match, ok: !onlyNow.length && !onlyOff.length, onlyNow, onlyOff };
 }
 

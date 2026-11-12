@@ -445,7 +445,10 @@ def main():
         log(f'[진단] 받은 화면 크기 {len(menu_html)}자, 제목: {title.group(1).strip() if title else "-"}')
         log(f'[진단] 글자: {text[:600]}')
         log('[진단] Probability 링크: ' + ' | '.join(re.findall(r'href="([^"]*Probab[^"]*)"', menu_html)[:15]))
-        log('[진단] 점검 문구: ' + ('있음' if re.search(r'점검|maintenance', menu_html, re.I) else '없음'))
+        if re.search(r'점검|maintenance', menu_html, re.I):
+            log('넥슨 점검 중으로 보여 이번 확인은 건너뜀 (데이터는 그대로)')
+            set_output(False)
+            return
         raise SystemExit(f'해독기 목록을 제대로 읽지 못함 ({len(menu)}개) — 넥슨 페이지 구조가 바뀌었는지 확인 필요')
     log(f'해독기 {len(menu)}개 확인')
     # 해독기 말고 다른 확률 페이지(상자·강화 등)가 생겼는지 기록만 남김
